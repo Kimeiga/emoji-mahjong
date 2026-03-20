@@ -265,25 +265,22 @@ export class GameRoom implements DurableObject {
     if (!info) return
 
     const state = this.runner.getState()
-    if (state.phase !== 'pon-available') {
-      this.send(ws, { type: 'error', message: 'No pon available' })
-      return
-    }
-    if (state.ponAvailable?.playerId !== info.playerId) {
-      this.send(ws, { type: 'error', message: 'Pon is not for you' })
-      return
-    }
+    if (state.phase !== 'pon-available' || !state.ponAvailable) return
+    if (state.ponAvailable.playerId !== info.playerId) return
+
+    // Capture pon info BEFORE callPon clears it (getState returns a reference)
+    const ponTileEmoji = state.ponAvailable!.tile.emoji
+    const ponTag = state.ponAvailable!.matchingTag
+    const ponPlayerName = this.lobbyPlayers.find(p => p.id === info.playerId)?.name ?? `Player ${info.playerId}`
 
     try {
-      const snapshot = this.runner.callPon(info.playerId)
-      // Send pon toast
-      const ponInfo = state.ponAvailable!
+      this.runner.callPon(info.playerId)
       this.broadcast({
         type: 'toast',
         kind: 'pon',
-        playerName: this.lobbyPlayers[info.playerId]?.name ?? `Player ${info.playerId}`,
-        emoji: ponInfo.tile.emoji,
-        tag: ponInfo.matchingTag,
+        playerName: ponPlayerName,
+        emoji: ponTileEmoji,
+        tag: ponTag,
       })
     } catch (e: any) {
       this.send(ws, { type: 'error', message: e.message })
@@ -481,15 +478,18 @@ export class GameRoom implements DurableObject {
     if (this.isHumanPlayer(ponPlayerId)) return
 
     if (shouldAICallPon(this.aiDifficulty)) {
-      const ponInfo = state.ponAvailable
+      // Capture before callPon clears it
+      const ponEmoji = state.ponAvailable.tile.emoji
+      const ponTag = state.ponAvailable.matchingTag
+      const ponName = this.lobbyPlayers.find(p => p.id === ponPlayerId)?.name ?? `Player ${ponPlayerId}`
       try {
         this.runner.callPon(ponPlayerId)
         this.broadcast({
           type: 'toast',
           kind: 'pon',
-          playerName: this.lobbyPlayers[ponPlayerId]?.name ?? `Player ${ponPlayerId}`,
-          emoji: ponInfo.tile.emoji,
-          tag: ponInfo.matchingTag,
+          playerName: ponName,
+          emoji: ponEmoji,
+          tag: ponTag,
         })
       } catch {
         return
