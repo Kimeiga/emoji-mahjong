@@ -198,7 +198,10 @@ function ServerBrowser({ playerName, onBack }: { playerName: string; onBack: () 
   )
 }
 
-const FLOATING_EMOJI = ['🀄','🎴','🐱','🌸','🎲','🍜','🏯','🎋','🐉','🎎','🌙','🎏','🍵','🦊','🌺','🎑']
+const FLOATING_EMOJI = [
+  '🀄','🎴','🐱','🌸','🎲','🍜','🏯','🎋','🐉','🎎','🌙','🎏','🍵','🦊','🌺','🎑',
+  '🐼','🌊','🔥','⭐','🎯','🧩','🃏','🎪','🌈','🍣','🦋','🐠','🎭','🏮','🧧','🎐',
+]
 
 function FloatingBackground() {
   return (
@@ -206,19 +209,20 @@ function FloatingBackground() {
       {FLOATING_EMOJI.map((emoji, i) => (
         <motion.div
           key={i}
-          className="absolute text-2xl opacity-[0.06]"
+          className="absolute opacity-[0.06]"
           style={{
-            left: `${(i * 17 + 5) % 90}%`,
-            top: `${(i * 23 + 10) % 85}%`,
+            left: `${(i * 13 + 3) % 92}%`,
+            top: `${(i * 19 + 7) % 88}%`,
+            fontSize: `${18 + (i % 5) * 6}px`,
           }}
           animate={{
-            y: [0, -30, 0],
-            rotate: [0, 10, -10, 0],
+            y: [0, -20 - (i % 3) * 10, 0],
+            rotate: [0, 8, -8, 0],
           }}
           transition={{
-            duration: 6 + (i % 4) * 2,
+            duration: 5 + (i % 5) * 2,
             repeat: Infinity,
-            delay: i * 0.4,
+            delay: i * 0.3,
             ease: 'easeInOut',
           }}
         >
@@ -308,9 +312,9 @@ export function MenuScreen() {
         {/* Title */}
         <div className="text-center mb-8">
           <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: 'spring', delay: 0.1, damping: 10 }}
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
             className="text-7xl mb-3"
           >
             🀄
