@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
+import { Reorder } from 'framer-motion'
 import { useGame } from '../../contexts/GameContext'
 import { TileView, TagPill } from '../shared/Tile'
 import { findDisplayTriplets } from '../../engine/triplet-display'
@@ -56,7 +57,7 @@ function LockedSetView({ tag, tiles }: { tag: string; tiles: Tile[] }) {
         <TagPill tag={tag} />
         <span className="text-[8px] text-amber-400">🔒</span>
       </div>
-      <div className="flex gap-0.5 bg-amber-900/20 rounded-xl px-1 py-1 border border-amber-500/40 relative">
+      <div className="flex gap-0 bg-amber-900/20 rounded-xl px-0.5 py-1 border border-amber-500/40 relative">
         <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center text-[8px] text-white font-bold z-10">
           🔒
         </div>
@@ -134,6 +135,10 @@ export function PlayerHand() {
     return hand.filter(t => !tripletTileIds.has(t.id) && !lockedTileIds.has(t.id))
   }, [hand, tripletTileIds, lockedTileIds])
 
+  // Ordered ungrouped tiles for drag-to-reorder
+  const [orderedUngrouped, setOrderedUngrouped] = useState(ungrouped)
+  useEffect(() => { setOrderedUngrouped(ungrouped) }, [ungrouped])
+
   // Check if player can declare riichi (has 12 tiles, some discard leaves tenpai)
   // Only in local mode — in multiplayer the server tells us
   const canRiichi = useMemo(() => {
@@ -197,10 +202,10 @@ export function PlayerHand() {
         <>
           {/* Backdrop — tap to close */}
           <div
-            className="fixed inset-0 z-[100]"
+            className="fixed inset-0 z-[100] bg-black/40"
             onClick={() => selectTile(null)}
           />
-          <div className="relative z-[101] bg-slate-800/95 rounded-xl p-3 mb-2 mx-auto max-w-sm border border-slate-700 shadow-xl">
+          <div className="fixed bottom-48 left-4 right-4 z-[101] bg-slate-800/95 rounded-xl p-3 mx-auto max-w-sm border border-slate-700 shadow-xl">
             {/* Header with emoji name and close button */}
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
@@ -265,7 +270,7 @@ export function PlayerHand() {
       )}
 
       {/* Hand: locked sets, then formed triplets, then loose tiles */}
-      <div className="flex flex-wrap gap-3 justify-center max-w-md mx-auto items-end relative z-[102]">
+      <div className="flex flex-wrap gap-1.5 justify-center max-w-md mx-auto items-end relative z-[102]">
         {/* Locked sets from pon */}
         {myLockedSets.map((rs) => (
           <LockedSetView key={rs.tag} tag={rs.tag} tiles={rs.tiles} />
@@ -283,25 +288,32 @@ export function PlayerHand() {
           />
         ))}
 
-        {/* Ungrouped tiles */}
-        {ungrouped.length > 0 && (
+        {/* Ungrouped tiles (drag to reorder) */}
+        {orderedUngrouped.length > 0 && (
           <div className="flex flex-col items-center">
             {triplets.length > 0 && (
               <div className="text-[9px] text-slate-500 mb-0.5">loose</div>
             )}
-            <div className="flex gap-1 flex-wrap justify-center">
-              {ungrouped.map((tile) => (
-                <TileView
-                  key={tile.id}
-                  tile={tile}
-                  size="lg"
-                  selected={selectedTileId === tile.id}
-                  highlighted={hasSelection && relatedTileIds.has(tile.id)}
-                  dimmed={hasSelection && tile.id !== selectedTileId && !relatedTileIds.has(tile.id)}
-                  onClick={() => handleTap(tile.id)}
-                />
+            <Reorder.Group
+              axis="x"
+              values={orderedUngrouped}
+              onReorder={setOrderedUngrouped}
+              className="flex gap-1 justify-center"
+              style={{ listStyle: 'none' }}
+            >
+              {orderedUngrouped.map((tile) => (
+                <Reorder.Item key={tile.id} value={tile} style={{ cursor: 'grab' }}>
+                  <TileView
+                    tile={tile}
+                    size="lg"
+                    selected={selectedTileId === tile.id}
+                    highlighted={hasSelection && relatedTileIds.has(tile.id)}
+                    dimmed={hasSelection && tile.id !== selectedTileId && !relatedTileIds.has(tile.id)}
+                    onClick={() => handleTap(tile.id)}
+                  />
+                </Reorder.Item>
               ))}
-            </div>
+            </Reorder.Group>
           </div>
         )}
       </div>

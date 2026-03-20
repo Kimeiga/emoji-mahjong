@@ -169,3 +169,7 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
       lastRiichiEvent: null,
     }),
 }))
+
+if (typeof window !== 'undefined') {
+  (window as any).__gameState = () => useMultiplayerStore.getState()
+}

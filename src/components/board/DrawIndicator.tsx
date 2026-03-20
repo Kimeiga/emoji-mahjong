@@ -20,7 +20,7 @@ export function DrawIndicator() {
           : 'text-slate-400'
         }
       `}>
-        {isMyTurn ? '← Your turn!' : `${currentName} thinking...`}
+        {isMyTurn ? '\u2193 Your turn!' : `${currentName} thinking...`}
       </span>
       <span className="text-xs text-slate-500">
         Round {turnCount}

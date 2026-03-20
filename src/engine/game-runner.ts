@@ -360,6 +360,17 @@ export class GameRunner {
     this.emit('turn-changed', { player: nextPlayer })
   }
 
+  /** Get tile IDs locked in revealed sets for a player */
+  private getLockedTileIds(playerId: PlayerId): Set<string> {
+    const ids = new Set<string>()
+    for (const rs of this.state.revealedSets) {
+      if (rs.playerId === playerId) {
+        for (const t of rs.tiles) ids.add(t.id)
+      }
+    }
+    return ids
+  }
+
   /** Find all players who could call pon on the discarded tile */
   checkPon(discardedTile: Tile, discarderId: PlayerId): { playerId: PlayerId; tag: string }[] {
     const results: { playerId: PlayerId; tag: string }[] = []
@@ -369,11 +380,14 @@ export class GameRunner {
       const pid = ((discarderId + offset) % 4) as PlayerId
       // Riichi players can't call pon (hand is locked)
       if (this.state.players[pid].riichi) continue
-      const hand = this.state.players[pid].hand
+
+      // Exclude tiles already in revealed sets
+      const lockedIds = this.getLockedTileIds(pid)
+      const availableHand = this.state.players[pid].hand.filter(t => !lockedIds.has(t.id))
 
       // For each tag on the discarded tile, check if this player has 2+ tiles with that tag
       for (const tag of discardedTile.tags) {
-        const matching = hand.filter(t => t.tags.includes(tag))
+        const matching = availableHand.filter(t => t.tags.includes(tag))
         if (matching.length >= 2) {
           results.push({ playerId: pid, tag })
           break // one pon opportunity per player is enough
@@ -386,8 +400,9 @@ export class GameRunner {
 
   /** Find 2 tiles in a player's hand that share a tag with the discarded tile */
   private findMatchingPair(playerId: PlayerId, _discardedTile: Tile, tag: string): [Tile, Tile] {
-    const hand = this.state.players[playerId].hand
-    const matching = hand.filter(t => t.tags.includes(tag))
+    const lockedIds = this.getLockedTileIds(playerId)
+    const available = this.state.players[playerId].hand.filter(t => !lockedIds.has(t.id))
+    const matching = available.filter(t => t.tags.includes(tag))
     return [matching[0], matching[1]]
   }
 
@@ -414,6 +429,7 @@ export class GameRunner {
     player.hand.push(claimedTile)
 
     // Record the revealed set (the 2 matching tiles + the claimed tile)
+    // Tiles remain in hand for count purposes but are tracked as locked
     this.state.revealedSets.push({
       playerId: callerId,
       tiles: [pon.matchingTiles[0], pon.matchingTiles[1], claimedTile],

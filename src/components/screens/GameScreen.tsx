@@ -123,23 +123,26 @@ export function GameScreen() {
         {/* Middle row: West - center - East */}
         <div className="flex-1 flex items-center justify-between px-1 min-h-0">
           {/* West */}
-          <div className="flex flex-col items-center gap-1 w-16">
+          <div className="flex items-center gap-1">
             <OpponentCompact playerId={west} />
-            <DiscardPool playerId={west} maxVisible={4} vertical />
+            <DiscardPool playerId={west} maxVisible={4} />
           </div>
 
-          {/* Center - your discards */}
-          <div className="flex-1 flex flex-col items-center justify-center min-h-0 px-2">
-            <div className="text-[10px] text-slate-500 mb-1">Your discards</div>
-            <DiscardPool playerId={myPlayerId} maxVisible={8} />
-          </div>
+          {/* Center spacer */}
+          <div className="flex-1" />
 
           {/* East */}
-          <div className="flex flex-col items-center gap-1 w-16">
+          <div className="flex items-center gap-1">
+            <DiscardPool playerId={east} maxVisible={4} />
             <OpponentCompact playerId={east} />
-            <DiscardPool playerId={east} maxVisible={4} vertical />
           </div>
         </div>
+      </div>
+
+      {/* Your discards */}
+      <div className="flex flex-col items-center py-1 px-2">
+        <div className="text-[10px] text-slate-500 mb-1">Your discards</div>
+        <DiscardPool playerId={myPlayerId} maxVisible={8} />
       </div>
 
       {/* Divider */}
