@@ -45,7 +45,7 @@ function TripletGroupView({
   )
 }
 
-function LockedSetView({ tag, tiles, tagCounts }: { tag: string; tiles: Tile[]; tagCounts: Record<string, number> }) {
+function LockedSetView({ tag, tiles, tagCounts, onTap }: { tag: string; tiles: Tile[]; tagCounts: Record<string, number>; onTap: (id: string) => void }) {
   const pts = scoreSet(tag, tagCounts)
   return (
     <div className="flex flex-col items-center opacity-90">
@@ -57,7 +57,7 @@ function LockedSetView({ tag, tiles, tagCounts }: { tag: string; tiles: Tile[]; 
       <div className="flex gap-0 bg-amber-900/20 rounded-xl px-0.5 py-1 border border-amber-500/40 relative">
         <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center text-[8px] text-white font-bold z-10">🔒</div>
         {tiles.map((tile) => (
-          <TileView key={tile.id} tile={tile} size="lg" />
+          <TileView key={tile.id} tile={tile} size="lg" onClick={() => onTap(tile.id)} />
         ))}
       </div>
     </div>
@@ -97,7 +97,6 @@ export function PlayerHand() {
   const hand = players[myPlayerId].hand
   const isRiichi = players[myPlayerId].riichi
   const isMyTurn = currentPlayer === myPlayerId && phase === 'discard'
-  const selectedTile = hand.find(t => t.id === selectedTileId)
 
   const myLockedSets = useMemo(() =>
     revealedSets.filter(rs => rs.playerId === myPlayerId),
@@ -110,6 +109,14 @@ export function PlayerHand() {
     }
     return ids
   }, [myLockedSets])
+
+  // Search hand AND revealed set tiles for the selected tile
+  const allMyTiles = useMemo(() => {
+    const meldTiles = myLockedSets.flatMap(rs => rs.tiles)
+    return [...hand, ...meldTiles]
+  }, [hand, myLockedSets])
+  const selectedTile = allMyTiles.find(t => t.id === selectedTileId)
+  const isSelectedLocked = selectedTile ? lockedTileIds.has(selectedTile.id) : false
 
   const unlockedHand = useMemo(() =>
     hand.filter(t => !lockedTileIds.has(t.id)),
@@ -166,9 +173,7 @@ export function PlayerHand() {
   }, [hand, isMyTurn, isRiichi])
 
   const handleTap = (tileId: string) => {
-    if (!isMyTurn) return
-    if (isRiichi) return
-    if (lockedTileIds.has(tileId)) return
+    // Always allow inspecting any tile (locked or not, any phase)
     if (selectedTileId === tileId) {
       selectTile(null) // tap again to close modal
     } else {
@@ -210,7 +215,7 @@ export function PlayerHand() {
       {selectedTile && (
         <>
           <div className="fixed inset-0 z-[100] bg-black/40" onClick={() => selectTile(null)} />
-          <div className="fixed top-16 left-4 right-4 z-[101] bg-slate-800/95 rounded-xl p-3 mx-auto max-w-sm border border-slate-700 shadow-xl">
+          <div className="fixed left-4 right-4 z-[101] bg-slate-800/95 rounded-xl p-3 mx-auto max-w-sm border border-slate-700 shadow-xl" style={{ bottom: '55%' }}>
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span className="text-2xl">{selectedTile.emoji}</span>
@@ -225,13 +230,16 @@ export function PlayerHand() {
               >✕</button>
             </div>
 
-            {isMyTurn && (
+            {isMyTurn && !isSelectedLocked && (
               <button
                 onClick={() => discardTile(selectedTile.id)}
                 className="w-full mt-1 mb-2 py-2 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 font-bold text-sm hover:bg-red-500/30 active:bg-red-500/40 transition-colors"
               >
                 Discard {selectedTile.emoji}
               </button>
+            )}
+            {isSelectedLocked && (
+              <div className="text-[10px] text-amber-400 text-center mb-1">🔒 Locked in a set</div>
             )}
 
             <div className="space-y-1 max-h-32 overflow-y-auto">
@@ -269,7 +277,7 @@ export function PlayerHand() {
       {/* Hand */}
       <div className="flex flex-wrap gap-1.5 justify-center max-w-md mx-auto items-end relative z-[102]">
         {myLockedSets.map((rs) => (
-          <LockedSetView key={rs.tag} tag={rs.tag} tiles={rs.tiles} tagCounts={tagCounts} />
+          <LockedSetView key={rs.tag} tag={rs.tag} tiles={rs.tiles} tagCounts={tagCounts} onTap={handleTap} />
         ))}
 
         {triplets.map((group) => (

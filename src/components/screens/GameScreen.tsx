@@ -20,36 +20,28 @@ function TileBacks({ count }: { count: number }) {
   )
 }
 
-/** Face-up revealed sets (pon) for an opponent */
-function OpponentMelds({ playerId }: { playerId: PlayerId }) {
-  const { revealedSets } = useGame()
-  const melds = revealedSets.filter(rs => rs.playerId === playerId)
-
-  if (melds.length === 0) return null
-
+/** Single meld (3 emoji in a bordered box) */
+function MeldView({ tiles }: { tiles: { id: string; emoji: string }[] }) {
   return (
-    <div className="flex gap-1 mt-0.5">
-      {melds.map((meld) => (
-        <div key={meld.tag} className="flex gap-px bg-amber-900/20 rounded px-0.5 py-0.5 border border-amber-500/30">
-          {meld.tiles.map((tile) => (
-            <span key={tile.id} className="text-[10px] leading-none">{tile.emoji}</span>
-          ))}
-        </div>
+    <div className="flex gap-px bg-amber-900/20 rounded px-0.5 py-0.5 border border-amber-500/30">
+      {tiles.map((tile) => (
+        <span key={tile.id} className="text-[10px] leading-none">{tile.emoji}</span>
       ))}
     </div>
   )
 }
 
-function OpponentCompact({ playerId }: { playerId: PlayerId }) {
-  const { players, currentPlayer, myPlayerId } = useGame()
+function OpponentCompact({ playerId, position }: { playerId: PlayerId; position: 'north' | 'east' | 'west' }) {
+  const { players, currentPlayer, myPlayerId, revealedSets } = useGame()
   const player = players[playerId]
   const isActive = currentPlayer === playerId
+  const melds = revealedSets.filter(rs => rs.playerId === playerId)
 
   if (playerId === myPlayerId) return null
 
-  return (
+  const core = (
     <div className={`
-      flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg text-center transition-all min-w-[56px]
+      flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg text-center transition-all min-w-[48px]
       ${isActive ? 'bg-yellow-400/15 ring-2 ring-yellow-400/50 scale-105' : ''}
       ${player.riichi ? 'ring-2 ring-red-500/60' : ''}
     `}>
@@ -58,9 +50,34 @@ function OpponentCompact({ playerId }: { playerId: PlayerId }) {
         {player.name.replace(' Bot', '')}
       </span>
       <TileBacks count={player.hand.length} />
-      <OpponentMelds playerId={playerId} />
       {player.riichi && <span className="text-[8px] text-red-400 font-bold">RIICHI</span>}
       {isActive && <span className="text-[8px] text-yellow-400">thinking...</span>}
+    </div>
+  )
+
+  if (position === 'north') {
+    // North: tile backs + melds in a horizontal row, vertically centered
+    return (
+      <div className="flex items-center gap-1">
+        {core}
+        {melds.length > 0 && (
+          <div className="flex gap-1">
+            {melds.map(m => <MeldView key={m.tag} tiles={m.tiles} />)}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // East/West: melds stacked vertically below to save horizontal space
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      {core}
+      {melds.length > 0 && (
+        <div className="flex flex-col gap-0.5">
+          {melds.map(m => <MeldView key={m.tag} tiles={m.tiles} />)}
+        </div>
+      )}
     </div>
   )
 }
@@ -158,7 +175,7 @@ export function GameScreen() {
       <div className="flex-1 flex flex-col min-h-0">
         {/* North */}
         <div className="flex flex-col items-center py-1">
-          <OpponentCompact playerId={north} />
+          <OpponentCompact playerId={north} position="north" />
           <DiscardPool playerId={north} maxVisible={6} />
         </div>
 
@@ -166,7 +183,7 @@ export function GameScreen() {
         <div className="flex-1 flex items-center justify-between px-1 min-h-0 relative">
           {/* West: opponent + discards stacked vertically toward center */}
           <div className="flex items-center gap-1">
-            <OpponentCompact playerId={west} />
+            <OpponentCompact playerId={west} position="west" />
             <DiscardPool playerId={west} maxVisible={4} vertical />
           </div>
 
@@ -178,7 +195,7 @@ export function GameScreen() {
           {/* East: discards + opponent (discards toward center) */}
           <div className="flex items-center gap-1">
             <DiscardPool playerId={east} maxVisible={4} vertical />
-            <OpponentCompact playerId={east} />
+            <OpponentCompact playerId={east} position="east" />
           </div>
         </div>
       </div>
