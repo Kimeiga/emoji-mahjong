@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { Reorder } from 'framer-motion'
 import { useGame } from '../../contexts/GameContext'
 import { TileView, TagPill } from '../shared/Tile'
@@ -93,6 +93,29 @@ export function PlayerHand() {
     players, myPlayerId, selectedTileId, selectTile, discardTile,
     phase, currentPlayer, revealedSets, declareRiichi, lastDrawnTileId, tagCounts,
   } = useGame()
+
+  const handRef = useRef<HTMLDivElement>(null)
+  const [modalBottomPx, setModalBottomPx] = useState<number | null>(null)
+
+  // Measure the hand container's top edge to position modal above it
+  const updateModalPosition = useCallback(() => {
+    if (handRef.current) {
+      const rect = handRef.current.getBoundingClientRect()
+      const bottomFromViewport = window.innerHeight - rect.top + 8 // 8px gap
+      setModalBottomPx(bottomFromViewport)
+    }
+  }, [])
+
+  useEffect(() => {
+    updateModalPosition()
+    window.addEventListener('resize', updateModalPosition)
+    return () => window.removeEventListener('resize', updateModalPosition)
+  }, [updateModalPosition])
+
+  // Recalculate when selection changes (hand layout might shift)
+  useEffect(() => {
+    updateModalPosition()
+  }, [selectedTileId, updateModalPosition])
 
   const hand = players[myPlayerId].hand
   const isRiichi = players[myPlayerId].riichi
@@ -215,7 +238,7 @@ export function PlayerHand() {
       {selectedTile && (
         <>
           <div className="fixed inset-0 z-[100] bg-black/40" onClick={() => selectTile(null)} />
-          <div className="fixed left-4 right-4 z-[101] bg-slate-800/95 rounded-xl p-3 mx-auto max-w-sm border border-slate-700 shadow-xl" style={{ bottom: '32%' }}>
+          <div className="fixed left-4 right-4 z-[101] bg-slate-800/95 rounded-xl p-3 mx-auto max-w-sm border border-slate-700 shadow-xl" style={{ bottom: modalBottomPx ? `${modalBottomPx}px` : '32%' }}>
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span className="text-2xl">{selectedTile.emoji}</span>
@@ -275,7 +298,7 @@ export function PlayerHand() {
       )}
 
       {/* Hand */}
-      <div className="flex flex-wrap gap-1.5 justify-center max-w-md mx-auto items-end relative z-[102]">
+      <div ref={handRef} className="flex flex-wrap gap-1.5 justify-center max-w-md mx-auto items-end relative z-[102]">
         {myLockedSets.map((rs) => (
           <LockedSetView key={rs.tag} tag={rs.tag} tiles={rs.tiles} tagCounts={tagCounts} onTap={handleTap} />
         ))}
