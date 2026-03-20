@@ -598,7 +598,8 @@ export class GameRunner {
       const pick = calculateAIMarketPick(
         this.state.players[pid].hand,
         this.state.market,
-        this.aiDifficulty
+        this.aiDifficulty,
+        this.state.tagCounts
       )
       if (pick) {
         this.pickMarket(pick.id)

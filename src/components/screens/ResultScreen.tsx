@@ -8,9 +8,10 @@ import { sendMessage } from '../../multiplayer/client'
 import { TagPill } from '../shared/Tile'
 import { findDisplayTriplets } from '../../engine/triplet-display'
 import { getStats, recordResult } from '../../utils/stats'
+import { scoreSets } from '../../engine/scoring'
 
 export function ResultScreen() {
-  const { phase, winner, players, myPlayerId, mode, turnCount, gameStartTime } = useGame()
+  const { phase, winner, players, myPlayerId, mode, turnCount, gameStartTime, tagCounts } = useGame()
   const startGame = useGameStore((s) => s.startGame)
   const setScreen = useAppStore((s) => s.setScreen)
   const disconnect = useAppStore((s) => s.disconnect)
@@ -78,27 +79,38 @@ export function ResultScreen() {
           <span>{mins}m {secs}s</span>
         </div>
 
-        {/* Winner's sets */}
-        {!isDraw && winnerPlayer && triplets.length > 0 && (
-          <div className="mt-4 grid grid-cols-2 gap-2 max-w-sm mx-auto">
-            {triplets.map((group, gi) => (
-              <motion.div
-                key={group.tag}
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.2 + gi * 0.12 }}
-                className="flex flex-col items-center"
-              >
-                <div className="mb-1"><TagPill tag={group.tag} /></div>
-                <div className="flex gap-0.5 bg-slate-700/40 rounded-xl px-1.5 py-1.5 border border-slate-600/50">
-                  {group.tiles.map((tile) => (
-                    <span key={tile.id} className="text-2xl">{tile.emoji}</span>
-                  ))}
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        )}
+        {/* Winner's sets with scores */}
+        {!isDraw && winnerPlayer && triplets.length > 0 && (() => {
+          const { setScores, total } = scoreSets(triplets, tagCounts)
+          return (
+            <>
+              <div className="mt-3 text-2xl font-black text-amber-400">
+                {total} points
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 max-w-sm mx-auto">
+                {triplets.map((group, gi) => (
+                  <motion.div
+                    key={group.tag}
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.2 + gi * 0.12 }}
+                    className="flex flex-col items-center"
+                  >
+                    <div className="mb-1 flex items-center gap-1">
+                      <TagPill tag={group.tag} />
+                      <span className="text-[10px] text-amber-400 font-bold">{setScores[gi].score}pt</span>
+                    </div>
+                    <div className="flex gap-0.5 bg-slate-700/40 rounded-xl px-1.5 py-1.5 border border-slate-600/50">
+                      {group.tiles.map((tile) => (
+                        <span key={tile.id} className="text-2xl">{tile.emoji}</span>
+                      ))}
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </>
+          )
+        })()}
 
         {isDraw && (
           <p className="text-slate-400 mt-3 text-sm">Wall exhausted — no one completed 4 sets.</p>

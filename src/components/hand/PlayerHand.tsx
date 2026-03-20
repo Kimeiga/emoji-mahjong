@@ -4,11 +4,12 @@ import { useGame } from '../../contexts/GameContext'
 import { TileView, TagPill } from '../shared/Tile'
 import { findDisplayTriplets } from '../../engine/triplet-display'
 import { canDeclareRiichi } from '../../engine/sets'
+import { scoreSet } from '../../engine/scoring'
 import type { Tile } from '../../types'
 import type { TripletGroup } from '../../engine/triplet-display'
 
 function TripletGroupView({
-  group, selectedTileId, relatedTileIds, hasSelection, onTap, lastDrawnTileId,
+  group, selectedTileId, relatedTileIds, hasSelection, onTap, lastDrawnTileId, tagCounts,
 }: {
   group: TripletGroup
   selectedTileId: string | null
@@ -16,10 +17,15 @@ function TripletGroupView({
   hasSelection: boolean
   onTap: (id: string) => void
   lastDrawnTileId: string | null
+  tagCounts: Record<string, number>
 }) {
+  const pts = scoreSet(group.tag, tagCounts)
   return (
     <div className="flex flex-col items-center">
-      <div className="mb-0.5"><TagPill tag={group.tag} /></div>
+      <div className="mb-0.5 flex items-center gap-1">
+        <TagPill tag={group.tag} />
+        <span className="text-[9px] text-amber-400 font-bold">{pts}pt</span>
+      </div>
       <div className="flex gap-0.5 bg-slate-700/30 rounded-xl px-1 py-1 border border-slate-600/50 relative">
         <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center text-[8px] text-white font-bold z-10">✓</div>
         {group.tiles.map((tile) => (
@@ -39,11 +45,13 @@ function TripletGroupView({
   )
 }
 
-function LockedSetView({ tag, tiles }: { tag: string; tiles: Tile[] }) {
+function LockedSetView({ tag, tiles, tagCounts }: { tag: string; tiles: Tile[]; tagCounts: Record<string, number> }) {
+  const pts = scoreSet(tag, tagCounts)
   return (
     <div className="flex flex-col items-center opacity-90">
       <div className="mb-0.5 flex items-center gap-1">
         <TagPill tag={tag} />
+        <span className="text-[9px] text-amber-400 font-bold">{pts}pt</span>
         <span className="text-[8px] text-amber-400">🔒</span>
       </div>
       <div className="flex gap-0 bg-amber-900/20 rounded-xl px-0.5 py-1 border border-amber-500/40 relative">
@@ -56,7 +64,7 @@ function LockedSetView({ tag, tiles }: { tag: string; tiles: Tile[] }) {
   )
 }
 
-function ProgressBar({ current, total }: { current: number; total: number }) {
+function ProgressBar({ current, total, score }: { current: number; total: number; score: number }) {
   const pct = (current / total) * 100
   return (
     <div className="flex items-center gap-2 mt-1.5 px-4">
@@ -71,6 +79,11 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
       <span className={`text-[10px] font-bold ${current >= total ? 'text-green-400' : 'text-slate-400'}`}>
         {current}/{total}
       </span>
+      {score > 0 && (
+        <span className="text-[10px] text-amber-400 font-bold">
+          {score} pts
+        </span>
+      )}
     </div>
   )
 }
@@ -226,9 +239,9 @@ export function PlayerHand() {
                     )}
                   </div>
                   {relatedTiles.length >= 2 ? (
-                    <span className="text-[9px] text-green-400 font-bold bg-green-500/10 px-1.5 py-0.5 rounded-full">✓ SET!</span>
+                    <span className="text-[9px] text-green-400 font-bold bg-green-500/10 px-1.5 py-0.5 rounded-full">✓ SET! ({scoreSet(tag, tagCounts)}pt)</span>
                   ) : (
-                    <span className="text-[9px] text-slate-500">need {2 - relatedTiles.length} more</span>
+                    <span className="text-[9px] text-slate-500">need {2 - relatedTiles.length} more → {scoreSet(tag, tagCounts)}pt</span>
                   )}
                 </div>
               ))}
@@ -248,7 +261,7 @@ export function PlayerHand() {
       {/* Hand */}
       <div className="flex flex-wrap gap-1.5 justify-center max-w-md mx-auto items-end relative z-[102]">
         {myLockedSets.map((rs) => (
-          <LockedSetView key={rs.tag} tag={rs.tag} tiles={rs.tiles} />
+          <LockedSetView key={rs.tag} tag={rs.tag} tiles={rs.tiles} tagCounts={tagCounts} />
         ))}
 
         {triplets.map((group) => (
@@ -260,6 +273,7 @@ export function PlayerHand() {
             hasSelection={hasSelection}
             onTap={handleTap}
             lastDrawnTileId={lastDrawnTileId}
+            tagCounts={tagCounts}
           />
         ))}
 
@@ -293,8 +307,13 @@ export function PlayerHand() {
         )}
       </div>
 
-      {/* Progress bar */}
-      <ProgressBar current={totalSets} total={4} />
+      {/* Progress bar with score */}
+      <ProgressBar current={totalSets} total={4} score={
+        Math.round((
+          myLockedSets.reduce((s, rs) => s + scoreSet(rs.tag, tagCounts), 0) +
+          triplets.reduce((s, g) => s + scoreSet(g.tag, tagCounts), 0)
+        ) * 10) / 10
+      } />
     </div>
   )
 }

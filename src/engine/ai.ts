@@ -73,7 +73,8 @@ export function shouldAIDeclareRiichi(hand: Tile[], difficulty: AIDifficulty = '
 export function calculateAIMarketPick(
   hand: Tile[],
   market: Tile[],
-  difficulty: AIDifficulty = 'medium'
+  difficulty: AIDifficulty = 'medium',
+  tagCounts?: Record<string, number>
 ): Tile | null {
   if (market.length === 0) return null
 
@@ -95,6 +96,11 @@ export function calculateAIMarketPick(
       score += freq
       // Bonus for completing a triplet (tag already has 2+ in hand)
       if (freq >= 2) score += 5
+      // Hard difficulty: bonus for rare tags (higher scoring potential)
+      if (difficulty === 'hard' && tagCounts && freq >= 1) {
+        const rarity = 80 / (tagCounts[tag] || 80)
+        score += rarity * 0.5
+      }
     }
     if (score > bestScore) {
       bestScore = score
@@ -102,8 +108,7 @@ export function calculateAIMarketPick(
     }
   }
 
-  // Difficulty determines threshold for picking vs blind draw
-  const thresholds = { easy: 999, medium: 3, hard: 1 }  // easy = almost always blind
+  const thresholds = { easy: 999, medium: 3, hard: 1 }
 
   if (bestScore >= thresholds[difficulty] && bestTile) {
     return bestTile
