@@ -9,7 +9,7 @@ import { POOL_SIZE } from '../data/emojis'
  */
 export function scoreSet(tag: string, tagCounts: Record<string, number>): number {
   const count = tagCounts[tag] || POOL_SIZE
-  return Math.round((POOL_SIZE / count) * 10) / 10
+  return Math.round(POOL_SIZE / count)
 }
 
 /**
@@ -23,7 +23,7 @@ export function scoreSets(
     tag: s.tag,
     score: scoreSet(s.tag, tagCounts),
   }))
-  const total = Math.round(setScores.reduce((sum, s) => sum + s.score, 0) * 10) / 10
+  const total = setScores.reduce((sum, s) => sum + s.score, 0)
   return { setScores, total }
 }
 
