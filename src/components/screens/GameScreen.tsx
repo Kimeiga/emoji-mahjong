@@ -4,6 +4,7 @@ import { useGame } from '../../contexts/GameContext'
 import { DiscardPool } from '../board/DiscardPool'
 import { DrawIndicator } from '../board/DrawIndicator'
 import { PlayerHand } from '../hand/PlayerHand'
+import { MarketRow } from '../board/MarketRow'
 import { PonButton } from '../hand/PonButton'
 import type { PlayerId } from '../../types'
 
@@ -156,6 +157,9 @@ export function GameScreen() {
           </div>
         </div>
       </div>
+
+      {/* Market row */}
+      <MarketRow />
 
       {/* Your discards */}
       <div className="flex flex-col items-center py-1 px-2">

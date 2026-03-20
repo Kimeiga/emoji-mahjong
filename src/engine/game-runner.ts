@@ -9,10 +9,10 @@
  */
 
 import type { Tile, Player, PlayerId, GamePhase } from '../types'
-import { HAND_SIZE, WIN_SIZE } from '../data/emojis'
-import { createDeck, drawTile as drawFromWall } from './deck'
+import { HAND_SIZE, WIN_SIZE, MARKET_SIZE } from '../data/emojis'
+import { selectTilePool, drawTile as drawFromWall } from './deck'
 import { isWinningHand, sortByTag, canDeclareRiichi } from './sets'
-import { calculateAIDiscard, shouldAIDeclareRiichi, calculateRiichiDiscard } from './ai'
+import { calculateAIDiscard, calculateAIMarketPick, shouldAIDeclareRiichi, calculateRiichiDiscard } from './ai'
 import type { AIDifficulty } from '../multiplayer/protocol'
 
 export interface GameSnapshot {
@@ -21,6 +21,8 @@ export interface GameSnapshot {
   turnCount: number
   wallSize: number
   winner: PlayerId | null
+  market: { id: string; emoji: string; name: string; tags: string[] }[]
+  tagCounts: Record<string, number>
   ponAvailable: {
     playerId: PlayerId
     tile: { id: string; emoji: string; name: string; tags: string[] }
@@ -50,6 +52,8 @@ export interface GameRunnerState {
   phase: GamePhase
   players: [Player, Player, Player, Player]
   wall: Tile[]
+  market: Tile[]
+  tagCounts: Record<string, number>
   currentPlayer: PlayerId
   turnCount: number
   selectedTileId: string | null
@@ -103,6 +107,8 @@ export class GameRunner {
         riichi: false,
       })) as unknown as [Player, Player, Player, Player],
       wall: [],
+      market: [],
+      tagCounts: {},
       currentPlayer: 0,
       turnCount: 0,
       selectedTileId: null,
@@ -139,6 +145,8 @@ export class GameRunner {
       turnCount: s.turnCount,
       wallSize: s.wall.length,
       winner: s.winner,
+      market: s.market.map(t => ({ id: t.id, emoji: t.emoji, name: t.name, tags: [...t.tags] })),
+      tagCounts: { ...s.tagCounts },
       ponAvailable: s.ponAvailable ? {
         playerId: s.ponAvailable.playerId,
         tile: { id: s.ponAvailable.tile.id, emoji: s.ponAvailable.tile.emoji, name: s.ponAvailable.tile.name, tags: [...s.ponAvailable.tile.tags] },
@@ -219,7 +227,8 @@ export class GameRunner {
   // ---- Actions ----
 
   start(playerConfig?: { name: string; isHuman: boolean }[]): GameSnapshot {
-    let wall = createDeck()
+    const { tiles: allTiles, tagCounts } = selectTilePool()
+    let wall = allTiles
     const players = this.initialState().players
 
     // Apply custom player configuration
@@ -245,10 +254,22 @@ export class GameRunner {
       p.hand = sortByTag(p.hand)
     }
 
+    // Populate market
+    const market: Tile[] = []
+    for (let i = 0; i < MARKET_SIZE && wall.length > 0; i++) {
+      const result = drawFromWall(wall)
+      if (result) {
+        market.push(result.tile)
+        wall = result.remaining
+      }
+    }
+
     this.state = {
       phase: 'draw',
       players,
       wall,
+      market,
+      tagCounts,
       currentPlayer: 0,
       turnCount: 1,
       selectedTileId: null,
@@ -264,17 +285,22 @@ export class GameRunner {
     return this.snapshot()
   }
 
-  draw(): GameSnapshot {
+  drawBlind(): GameSnapshot {
     if (this.state.phase !== 'draw') {
       throw new Error(`Cannot draw in phase "${this.state.phase}"`)
     }
 
     const result = drawFromWall(this.state.wall)
     if (!result) {
-      this.state.phase = 'draw-game'
-      this.emit('draw-game')
-      this.emit('state-changed', this.snapshot())
-      return this.snapshot()
+      // Wall empty — check if market is empty too
+      if (this.state.market.length === 0) {
+        this.state.phase = 'draw-game'
+        this.emit('draw-game')
+        this.emit('state-changed', this.snapshot())
+        return this.snapshot()
+      }
+      // Wall empty but market has tiles — player must pick from market
+      throw new Error('Wall is empty — pick from the market instead')
     }
 
     const pid = this.state.currentPlayer
@@ -284,9 +310,47 @@ export class GameRunner {
     this.state.lastDrawnTileId = result.tile.id
     this.state.phase = 'discard'
 
-    this.emit('tile-drawn', { player: pid, tile: result.tile })
+    this.emit('tile-drawn', { player: pid, tile: result.tile, source: 'wall' })
     this.emit('state-changed', this.snapshot())
     return this.snapshot()
+  }
+
+  draw(): GameSnapshot {
+    return this.drawBlind()
+  }
+
+  pickMarket(tileId: string): GameSnapshot {
+    if (this.state.phase !== 'draw') {
+      throw new Error(`Cannot pick from market in phase "${this.state.phase}"`)
+    }
+
+    const tileIdx = this.state.market.findIndex(t => t.id === tileId)
+    if (tileIdx === -1) {
+      throw new Error(`Tile "${tileId}" not in market`)
+    }
+
+    const pid = this.state.currentPlayer
+    const tile = this.state.market.splice(tileIdx, 1)[0]
+    this.state.players[pid].hand.push(tile)
+    this.state.players[pid].hand = sortByTag(this.state.players[pid].hand)
+    this.state.lastDrawnTileId = tile.id
+    this.state.phase = 'discard'
+
+    this.refillMarket()
+
+    this.emit('tile-drawn', { player: pid, tile, source: 'market' })
+    this.emit('state-changed', this.snapshot())
+    return this.snapshot()
+  }
+
+  private refillMarket() {
+    while (this.state.market.length < MARKET_SIZE && this.state.wall.length > 0) {
+      const result = drawFromWall(this.state.wall)
+      if (result) {
+        this.state.market.push(result.tile)
+        this.state.wall = result.remaining
+      }
+    }
   }
 
   discard(tileIdOrIndex: string | number): GameSnapshot {
@@ -531,7 +595,23 @@ export class GameRunner {
     }
 
     if (this.state.phase === 'draw') {
-      this.draw()
+      const pick = calculateAIMarketPick(
+        this.state.players[pid].hand,
+        this.state.market,
+        this.aiDifficulty
+      )
+      if (pick) {
+        this.pickMarket(pick.id)
+      } else {
+        try {
+          this.drawBlind()
+        } catch {
+          // Wall empty, must pick from market
+          if (this.state.market.length > 0) {
+            this.pickMarket(this.state.market[0].id)
+          }
+        }
+      }
     }
 
     if (this.state.phase === 'discard') {
@@ -572,10 +652,6 @@ export class GameRunner {
       if (this.state.phase === 'pon-available') break // let pon be handled externally
       if (this.state.currentPlayer === 0) break
       this.aiTurn()
-    }
-
-    if (this.state.currentPlayer === 0 && this.state.phase === 'draw') {
-      this.draw()
     }
 
     return this.snapshot()
@@ -628,7 +704,9 @@ game.status()         One-line status
 game.showHand()       Show your hand with indices and tags
 game.showHand(1)      Show a specific player's hand
 game.analyzeHand()    Analyze your hand for potential sets
-game.draw()           Draw a tile (when it's draw phase)
+game.drawBlind()      Draw a tile from the wall (blind)
+game.draw()           Alias for drawBlind()
+game.pickMarket(id)   Pick a tile from the market row
 game.discard(3)       Discard tile at index 3
 game.discard('id')    Discard tile by ID
 game.declareRiichi(0) Declare riichi (must be tenpai)

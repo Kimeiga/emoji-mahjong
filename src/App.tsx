@@ -34,8 +34,11 @@ function SinglePlayerGame() {
   const declareRiichi = useGameStore((s) => s.declareRiichi)
   const clearPonEvent = useGameStore((s) => s.clearPonEvent)
   const clearRiichiEvent = useGameStore((s) => s.clearRiichiEvent)
+  const market = useGameStore((s) => s.market)
+  const tagCounts = useGameStore((s) => s.tagCounts)
+  const pickMarket = useGameStore((s) => s.pickMarket)
+  const drawBlind = useGameStore((s) => s.drawBlind)
   const startGame = useGameStore((s) => s.startGame)
-  const drawCurrentPlayer = useGameStore((s) => s.drawCurrentPlayer)
 
   useAutoPlay('local')
 
@@ -44,20 +47,17 @@ function SinglePlayerGame() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  useEffect(() => {
-    if (currentPlayer === 0 && phase === 'draw') {
-      const timer = setTimeout(() => drawCurrentPlayer(), 400)
-      return () => clearTimeout(timer)
-    }
-  }, [currentPlayer, phase, drawCurrentPlayer])
+  // Human draw phase is now handled by the MarketRow UI (pick-market or draw-blind)
 
   const ctx: GameContextValue = {
     mode: 'local',
     phase, players, wallCount: wall.length, currentPlayer, turnCount,
     selectedTileId, winner, ponAvailable, revealedSets,
+    market, tagCounts,
     myPlayerId: 0 as PlayerId,
     lastDrawnTileId, gameStartTime,
     selectTile, discardTile, callPon, declinePon, declareRiichi,
+    pickMarket, drawBlind,
     lastPonEvent, lastRiichiEvent, clearPonEvent, clearRiichiEvent,
   }
 
@@ -83,6 +83,8 @@ function MultiplayerGame() {
   const revealedSets = useMultiplayerStore((s) => s.revealedSets)
   const lastPonEvent = useMultiplayerStore((s) => s.lastPonEvent)
   const lastRiichiEvent = useMultiplayerStore((s) => s.lastRiichiEvent)
+  const market = useMultiplayerStore((s) => s.market)
+  const tagCounts = useMultiplayerStore((s) => s.tagCounts)
 
   const selectTile = useMultiplayerStore((s) => s.selectTile)
   const clearPonEvent = useMultiplayerStore((s) => s.clearPonEvent)
@@ -91,13 +93,15 @@ function MultiplayerGame() {
   const ctx: GameContextValue = {
     mode: 'multiplayer',
     phase, players, wallCount, currentPlayer, turnCount,
-    selectedTileId, winner, ponAvailable, revealedSets, myPlayerId,
+    selectedTileId, winner, ponAvailable, revealedSets, market, tagCounts, myPlayerId,
     lastDrawnTileId: null, gameStartTime: Date.now(),
     selectTile,
     discardTile: (id: string) => { if (ws) sendMessage(ws, { type: 'discard', tileId: id }) },
     callPon: () => { if (ws) sendMessage(ws, { type: 'call-pon' }) },
     declinePon: () => { if (ws) sendMessage(ws, { type: 'decline-pon' }) },
     declareRiichi: () => { if (ws) sendMessage(ws, { type: 'declare-riichi' }) },
+    pickMarket: (tileId: string) => { if (ws) sendMessage(ws, { type: 'pick-market', tileId }) },
+    drawBlind: () => { if (ws) sendMessage(ws, { type: 'draw-blind' }) },
     lastPonEvent, lastRiichiEvent, clearPonEvent, clearRiichiEvent,
   }
 

@@ -7,7 +7,7 @@
 
 import { GameRunner } from '../src/engine/game-runner'
 import type { GameSnapshot } from '../src/engine/game-runner'
-import { shouldAICallPon } from '../src/engine/ai'
+import { shouldAICallPon, calculateAIMarketPick } from '../src/engine/ai'
 import type {
   AIDifficulty,
   ClientMessage,
@@ -135,6 +135,12 @@ export class GameRoom implements DurableObject {
         break
       case 'declare-riichi':
         this.handleDeclareRiichi(ws)
+        break
+      case 'pick-market':
+        this.handlePickMarket(ws, msg.tileId)
+        break
+      case 'draw-blind':
+        this.handleDrawBlind(ws)
         break
       case 'rematch':
         this.handleRematch(ws)
@@ -330,6 +336,38 @@ export class GameRoom implements DurableObject {
     this.broadcastGameState()
   }
 
+  private handlePickMarket(ws: WebSocket, tileId: string) {
+    if (!this.runner || !this.gameStarted) return
+    const info = this.players.get(ws)
+    if (!info) return
+    const state = this.runner.getState()
+    if (state.currentPlayer !== info.playerId || state.phase !== 'draw') return
+    try {
+      this.runner.pickMarket(tileId)
+    } catch (e: any) {
+      this.send(ws, { type: 'error', message: e.message })
+      return
+    }
+    this.broadcastGameState()
+    this.scheduleAITurns()
+  }
+
+  private handleDrawBlind(ws: WebSocket) {
+    if (!this.runner || !this.gameStarted) return
+    const info = this.players.get(ws)
+    if (!info) return
+    const state = this.runner.getState()
+    if (state.currentPlayer !== info.playerId || state.phase !== 'draw') return
+    try {
+      this.runner.drawBlind()
+    } catch (e: any) {
+      this.send(ws, { type: 'error', message: e.message })
+      return
+    }
+    this.broadcastGameState()
+    this.scheduleAITurns()
+  }
+
   private handleRematch(ws: WebSocket) {
     const info = this.players.get(ws)
     if (!info) return
@@ -430,6 +468,8 @@ export class GameRoom implements DurableObject {
       myPlayerId: playerId,
       ponAvailable: snapshot.ponAvailable,
       revealedSets: snapshot.revealedSets,
+      market: snapshot.market,
+      tagCounts: snapshot.tagCounts,
       players: snapshot.players.map((p) => {
         // Use lobby player names/isHuman (runner names may not persist)
         const lp = this.lobbyPlayers.find(l => l.id === p.id)
@@ -488,14 +528,7 @@ export class GameRoom implements DurableObject {
       } else if (state.phase === 'discard') {
         setTimeout(() => this.handleAIDiscard(), 800)
       }
-    } else if (isHuman && state.phase === 'draw') {
-      // Auto-draw for human players
-      try {
-        this.runner.draw()
-        this.broadcastGameState()
-      } catch {
-        // ignore
-      }
+    // Human players in draw phase now choose via pick-market or draw-blind messages
     }
   }
 
@@ -542,9 +575,21 @@ export class GameRoom implements DurableObject {
     if (state.phase !== 'draw') return
     if (this.isHumanPlayer(state.currentPlayer)) return
 
+    // AI picks from market or draws blind
+    const hand = state.players[state.currentPlayer].hand
+    const pick = calculateAIMarketPick(hand, state.market, this.aiDifficulty)
+
     try {
-      this.runner.draw()
+      if (pick) {
+        this.runner.pickMarket(pick.id)
+      } else {
+        this.runner.drawBlind()
+      }
     } catch {
+      // If drawBlind fails (wall empty), try market
+      if (state.market.length > 0) {
+        try { this.runner.pickMarket(state.market[0].id) } catch { return }
+      }
       return
     }
 
@@ -552,7 +597,7 @@ export class GameRoom implements DurableObject {
 
     // After drawing, the AI needs to discard
     const newState = this.runner.getState()
-    if (newState.phase === 'discard' && !newState.players[newState.currentPlayer].isHuman) {
+    if (newState.phase === 'discard' && !this.isHumanPlayer(newState.currentPlayer)) {
       setTimeout(() => this.handleAIDiscard(), 800)
     }
   }

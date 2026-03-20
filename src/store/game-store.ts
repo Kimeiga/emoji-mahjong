@@ -11,6 +11,8 @@ if (typeof window !== 'undefined') {
 interface GameActions {
   startGame: () => void
   drawCurrentPlayer: () => void
+  pickMarket: (tileId: string) => void
+  drawBlind: () => void
   selectTile: (tileId: string | null) => void
   discardTile: (tileId: string) => void
   aiTurn: () => void
@@ -50,6 +52,8 @@ function stateFromRunner(): GameState {
       tiles: rs.tiles.map(t => ({ ...t })),
       tag: rs.tag,
     })),
+    market: [...rs.market],
+    tagCounts: { ...rs.tagCounts },
   }
 }
 
@@ -78,6 +82,32 @@ export const useGameStore = create<Store>((set) => {
         const drawnId = runner.getState().lastDrawnTileId
         set({ ...stateFromRunner(), lastDrawnTileId: drawnId })
         // Clear drawn highlight after 1.5s
+        if (drawnId) {
+          setTimeout(() => set({ lastDrawnTileId: null }), 1500)
+        }
+      } catch {
+        // ignore
+      }
+    },
+
+    pickMarket: (tileId: string) => {
+      try {
+        runner.pickMarket(tileId)
+        const drawnId = runner.getState().lastDrawnTileId
+        set({ ...stateFromRunner(), lastDrawnTileId: drawnId })
+        if (drawnId) {
+          setTimeout(() => set({ lastDrawnTileId: null }), 1500)
+        }
+      } catch {
+        // ignore
+      }
+    },
+
+    drawBlind: () => {
+      try {
+        runner.drawBlind()
+        const drawnId = runner.getState().lastDrawnTileId
+        set({ ...stateFromRunner(), lastDrawnTileId: drawnId })
         if (drawnId) {
           setTimeout(() => set({ lastDrawnTileId: null }), 1500)
         }

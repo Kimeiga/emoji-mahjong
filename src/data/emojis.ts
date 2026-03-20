@@ -42,3 +42,5 @@ export const COPIES_PER_TILE = 1
 export const HAND_SIZE = 11
 export const WIN_SIZE = 12
 export const TRIPLETS_TO_WIN = 4
+export const POOL_SIZE = 80
+export const MARKET_SIZE = 5

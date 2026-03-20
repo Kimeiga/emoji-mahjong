@@ -25,6 +25,8 @@ export type ClientMessage =
   | { type: 'call-pon' }
   | { type: 'decline-pon' }
   | { type: 'declare-riichi' }
+  | { type: 'pick-market'; tileId: string }
+  | { type: 'draw-blind' }
   | { type: 'rematch' }
 
 // ── Server → Client ──
@@ -69,6 +71,8 @@ export interface GameStateView {
   } | null
   revealedSets: { playerId: PlayerId; tiles: TileData[]; tag: string }[]
   players: PlayerView[]
+  market: TileData[]
+  tagCounts: Record<string, number>
 }
 
 export type ServerMessage =

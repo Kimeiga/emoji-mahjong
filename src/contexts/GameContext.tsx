@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { PlayerId, Player, GamePhase, PonInfo, RevealedSet } from '../types'
+import type { PlayerId, Player, GamePhase, PonInfo, RevealedSet, Tile } from '../types'
 
 export interface GameContextValue {
   mode: 'local' | 'multiplayer'
@@ -12,6 +12,8 @@ export interface GameContextValue {
   winner: PlayerId | null
   ponAvailable: PonInfo | null
   revealedSets: RevealedSet[]
+  market: Tile[]
+  tagCounts: Record<string, number>
   myPlayerId: PlayerId
   lastDrawnTileId: string | null
   gameStartTime: number
@@ -22,6 +24,8 @@ export interface GameContextValue {
   callPon: (playerId: PlayerId) => void
   declinePon: () => void
   declareRiichi: (playerId: PlayerId) => void
+  pickMarket: (tileId: string) => void
+  drawBlind: () => void
 
   // Toasts
   lastPonEvent: { playerName: string; emoji: string; tag: string } | null

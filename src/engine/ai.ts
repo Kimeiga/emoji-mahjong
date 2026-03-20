@@ -67,6 +67,52 @@ export function shouldAIDeclareRiichi(hand: Tile[], difficulty: AIDifficulty = '
 }
 
 /**
+ * AI decides whether to pick from the market or draw blind.
+ * Returns the market tile to pick, or null for blind draw.
+ */
+export function calculateAIMarketPick(
+  hand: Tile[],
+  market: Tile[],
+  difficulty: AIDifficulty = 'medium'
+): Tile | null {
+  if (market.length === 0) return null
+
+  // Score each market tile by tag overlap with hand
+  const handTagFreq = new Map<string, number>()
+  for (const tile of hand) {
+    for (const tag of tile.tags) {
+      handTagFreq.set(tag, (handTagFreq.get(tag) || 0) + 1)
+    }
+  }
+
+  let bestTile: Tile | null = null
+  let bestScore = 0
+
+  for (const tile of market) {
+    let score = 0
+    for (const tag of tile.tags) {
+      const freq = handTagFreq.get(tag) || 0
+      score += freq
+      // Bonus for completing a triplet (tag already has 2+ in hand)
+      if (freq >= 2) score += 5
+    }
+    if (score > bestScore) {
+      bestScore = score
+      bestTile = tile
+    }
+  }
+
+  // Difficulty determines threshold for picking vs blind draw
+  const thresholds = { easy: 999, medium: 3, hard: 1 }  // easy = almost always blind
+
+  if (bestScore >= thresholds[difficulty] && bestTile) {
+    return bestTile
+  }
+
+  return null
+}
+
+/**
  * Pick the best riichi discard: the one that maximizes waiting tags.
  */
 export function calculateRiichiDiscard(hand: Tile[]): Tile {

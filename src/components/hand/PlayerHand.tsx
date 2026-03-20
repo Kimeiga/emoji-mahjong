@@ -78,7 +78,7 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
 export function PlayerHand() {
   const {
     players, myPlayerId, selectedTileId, selectTile, discardTile,
-    phase, currentPlayer, revealedSets, declareRiichi, lastDrawnTileId,
+    phase, currentPlayer, revealedSets, declareRiichi, lastDrawnTileId, tagCounts,
   } = useGame()
 
   const hand = players[myPlayerId].hand
@@ -216,7 +216,7 @@ export function PlayerHand() {
             <div className="space-y-1 max-h-32 overflow-y-auto">
               {tagRelations.slice(0, 8).map(({ tag, relatedTiles }) => (
                 <div key={tag} className="flex items-center gap-1.5 flex-wrap">
-                  <TagPill tag={tag} count={relatedTiles.length} />
+                  <TagPill tag={tag} count={tagCounts[tag] || 0} />
                   <div className="flex gap-0.5">
                     {relatedTiles.slice(0, 5).map(t => (
                       <span key={t.id} className="text-sm">{t.emoji}</span>
@@ -237,7 +237,7 @@ export function PlayerHand() {
                   {selectedTile.tags
                     .filter(t => !tagRelations.find(r => r.tag === t))
                     .slice(0, 6)
-                    .map(tag => (<TagPill key={tag} tag={tag} />))}
+                    .map(tag => (<TagPill key={tag} tag={tag} count={tagCounts[tag] || 0} />))}
                 </div>
               )}
             </div>

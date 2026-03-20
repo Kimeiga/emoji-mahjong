@@ -52,4 +52,6 @@ export interface GameState {
   winner: PlayerId | null
   ponAvailable: PonInfo | null
   revealedSets: RevealedSet[]
+  market: Tile[]
+  tagCounts: Record<string, number>
 }

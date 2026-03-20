@@ -13,6 +13,8 @@ interface MultiplayerState {
   winner: PlayerId | null
   ponAvailable: PonInfo | null
   revealedSets: RevealedSet[]
+  market: Tile[]
+  tagCounts: Record<string, number>
   myPlayerId: PlayerId
 
   // Lobby state
@@ -89,6 +91,8 @@ function convertGameState(state: GameStateView): Partial<MultiplayerState> {
       tiles: rs.tiles.map((t) => ({ id: t.id, emoji: t.emoji, name: t.name, tags: t.tags })),
       tag: rs.tag,
     })),
+    market: state.market?.map(t => ({ id: t.id, emoji: t.emoji, name: t.name, tags: t.tags })) ?? [],
+    tagCounts: state.tagCounts ?? {},
   }
 }
 
@@ -102,6 +106,8 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
   winner: null,
   ponAvailable: null,
   revealedSets: [],
+  market: [],
+  tagCounts: {},
   myPlayerId: 0 as PlayerId,
 
   lobbyPlayers: [],
@@ -163,6 +169,8 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
           winner: null,
           ponAvailable: null,
           revealedSets: [],
+          market: [],
+          tagCounts: {},
           rematchVotes: null,
           lastPonEvent: null,
           lastRiichiEvent: null,
@@ -187,6 +195,8 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
       winner: null,
       ponAvailable: null,
       revealedSets: [],
+      market: [],
+      tagCounts: {},
       lobbyPlayers: [],
       gameStarted: false,
       rematchVotes: null,
