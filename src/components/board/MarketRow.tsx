@@ -114,7 +114,7 @@ export function MarketRow() {
         />
       )}
 
-      <div className="market-anchor flex flex-col items-center py-2 px-2">
+      <div className="market-anchor flex flex-col items-center py-2 px-2 relative z-[102]">
         <div className="text-[10px] text-slate-500 mb-1">
           {isMyDraw ? 'Tap a tile to inspect, then pick' : 'Market'}
         </div>
