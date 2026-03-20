@@ -97,11 +97,11 @@ export class GameRunner {
       players: [0, 1, 2, 3].map((i) => ({
         id: i as PlayerId,
         name: PLAYER_NAMES[i],
-        hand: [],
-        discards: [],
+        hand: [] as Tile[],
+        discards: [] as Tile[],
         isHuman: i === 0,
         riichi: false,
-      })) as [Player, Player, Player, Player],
+      })) as unknown as [Player, Player, Player, Player],
       wall: [],
       currentPlayer: 0,
       turnCount: 0,
@@ -141,7 +141,7 @@ export class GameRunner {
       winner: s.winner,
       ponAvailable: s.ponAvailable ? {
         playerId: s.ponAvailable.playerId,
-        tile: { id: s.ponAvailable.tile.id, emoji: s.ponAvailable.tile.emoji, tags: [...s.ponAvailable.tile.tags] },
+        tile: { id: s.ponAvailable.tile.id, emoji: s.ponAvailable.tile.emoji, name: s.ponAvailable.tile.name, tags: [...s.ponAvailable.tile.tags] },
         matchingTag: s.ponAvailable.matchingTag,
         matchingTiles: s.ponAvailable.matchingTiles.map(t => ({ id: t.id, emoji: t.emoji, name: t.name, tags: [...t.tags] })),
       } : null,
@@ -248,6 +248,7 @@ export class GameRunner {
       ponAvailable: null,
       ponDiscarderId: null,
       revealedSets: [],
+      lastDrawnTileId: null,
     }
 
     this.emit('game-started')
@@ -376,7 +377,7 @@ export class GameRunner {
   }
 
   /** Find 2 tiles in a player's hand that share a tag with the discarded tile */
-  private findMatchingPair(playerId: PlayerId, discardedTile: Tile, tag: string): [Tile, Tile] {
+  private findMatchingPair(playerId: PlayerId, _discardedTile: Tile, tag: string): [Tile, Tile] {
     const hand = this.state.players[playerId].hand
     const matching = hand.filter(t => t.tags.includes(tag))
     return [matching[0], matching[1]]

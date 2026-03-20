@@ -13,7 +13,7 @@ export function useAutoPlay(mode: 'local' | 'multiplayer' = 'local') {
   const callPon = useGameStore((s) => s.callPon)
   const declinePon = useGameStore((s) => s.declinePon)
   const humanRiichi = useGameStore((s) => s.players[0].riichi)
-  const timerRef = useRef<ReturnType<typeof setTimeout>>()
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   useEffect(() => {
     // Skip all auto-play logic in multiplayer mode — server drives the game

@@ -65,7 +65,7 @@ function stateFromRunner(): GameState {
   }
 }
 
-export const useGameStore = create<Store>((set, get) => {
+export const useGameStore = create<Store>((set) => {
   // Sync React state whenever runner emits state changes
   runner.on((event) => {
     if (event === 'state-changed') {
