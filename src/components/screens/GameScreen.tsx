@@ -143,13 +143,16 @@ export function GameScreen() {
         </div>
 
         {/* Middle: West - compass - East */}
-        <div className="flex-1 flex items-center justify-between px-1 min-h-0">
+        <div className="flex-1 flex items-center justify-between px-1 min-h-0 relative">
           <div className="flex items-center gap-1">
             <OpponentCompact playerId={west} />
             <DiscardPool playerId={west} maxVisible={4} />
           </div>
 
-          <CompassRose />
+          {/* Compass centered absolutely so discards don't shift it */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <CompassRose />
+          </div>
 
           <div className="flex items-center gap-1">
             <DiscardPool playerId={east} maxVisible={4} />

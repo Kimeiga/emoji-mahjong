@@ -158,7 +158,7 @@ export function PlayerHand() {
     if (isRiichi) return
     if (lockedTileIds.has(tileId)) return
     if (selectedTileId === tileId) {
-      discardTile(tileId)
+      selectTile(null) // tap again to close modal
     } else {
       selectTile(tileId)
     }
@@ -169,31 +169,30 @@ export function PlayerHand() {
 
   return (
     <div className="px-2 pb-3 pt-1">
-      {isRiichi && (
-        <div className="text-center text-xs text-red-400 font-bold mb-1 tracking-widest">
-          RIICHI — hand locked
-        </div>
-      )}
-
-      {canRiichi && !selectedTile && (
-        <div className="flex justify-center mb-1.5">
+      {/* Status area — fixed height to prevent layout shift when modal opens */}
+      <div className="h-7 flex items-center justify-center">
+        {isRiichi && (
+          <div className="text-center text-xs text-red-400 font-bold tracking-widest">
+            RIICHI — hand locked
+          </div>
+        )}
+        {canRiichi && !selectedTile && !isRiichi && (
           <button
             onClick={() => declareRiichi(myPlayerId)}
             className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-red-600 to-red-500 text-white font-bold text-sm tracking-wider shadow-lg shadow-red-500/30 active:shadow-inner animate-pulse"
           >
             RIICHI!
           </button>
-        </div>
-      )}
-
-      {isMyTurn && !selectedTile && !isRiichi && (
-        <div className="text-center text-xs text-yellow-400 mb-1 animate-pulse">
-          Tap to inspect, tap again to discard
-        </div>
-      )}
-      {!isMyTurn && currentPlayer === myPlayerId && phase === 'draw' && (
-        <div className="text-center text-xs text-sky-400 mb-1">Drawing...</div>
-      )}
+        )}
+        {isMyTurn && !selectedTile && !isRiichi && !canRiichi && (
+          <div className="text-center text-xs text-yellow-400 animate-pulse">
+            Tap a tile to inspect
+          </div>
+        )}
+        {!isMyTurn && currentPlayer === myPlayerId && phase === 'draw' && (
+          <div className="text-center text-xs text-sky-400">Drawing...</div>
+        )}
+      </div>
 
       {/* Tag inspector modal — fixed overlay */}
       {selectedTile && (
