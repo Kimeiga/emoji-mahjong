@@ -3,12 +3,60 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🀄</text></svg>" />
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🀄</text></svg>" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="theme-color" content="#0f172a" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
     <title>Emoji Mahjong - Match Emoji by Semantic Tags</title>
+    <meta name="description" content="A strategic multiplayer tile game where you match emoji by their semantic tags. Pick from the market, form sets, score points for rare tags. Play with friends online!" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Emoji Mahjong" />
+    <meta property="og:description" content="Match emoji by semantic tags. Pick from the market, form sets of 3, score big with rare tags. Play with friends online!" />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Emoji Mahjong - three emoji tiles (cat, dog, rabbit) forming an 'animal' set" />
+    <meta property="og:url" content="https://emojimahjong.pages.dev" />
+    <meta property="og:site_name" content="Emoji Mahjong" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Emoji Mahjong" />
+    <meta name="twitter:description" content="Match emoji by semantic tags. Strategic multiplayer tile game with market picks and tag scoring." />
+    <meta name="twitter:image" content="/og-image.png" />
+    <meta name="twitter:image:alt" content="Emoji Mahjong - three emoji tiles forming an 'animal' set" />
+
+    <!-- Additional SEO -->
+    <meta name="keywords" content="emoji, mahjong, tile game, multiplayer, puzzle, strategy, semantic, tags, online game" />
+    <meta name="author" content="Emoji Mahjong" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://emojimahjong.pages.dev" />
+
+    <!-- Structured data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "VideoGame",
+      "name": "Emoji Mahjong",
+      "description": "A strategic multiplayer tile game where you match emoji by their semantic tags.",
+      "url": "https://emojimahjong.pages.dev",
+      "genre": ["Puzzle", "Strategy", "Board Game"],
+      "gamePlatform": ["Web Browser", "Mobile Web"],
+      "numberOfPlayers": {
+        "@type": "QuantitativeValue",
+        "minValue": 1,
+        "maxValue": 4
+      },
+      "playMode": ["SinglePlayer", "MultiPlayer"],
+      "applicationCategory": "Game",
+      "operatingSystem": "Any"
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
