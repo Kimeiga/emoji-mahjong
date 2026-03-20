@@ -214,8 +214,8 @@ export function PlayerHand() {
       {/* Tag inspector modal — fixed overlay */}
       {selectedTile && (
         <>
-          <div className="fixed inset-0 z-[100] bg-black/40" onClick={() => selectTile(null)} />
-          <div className="modal-above-hand fixed left-4 right-4 z-[101] bg-slate-800/95 rounded-xl p-3 mx-auto max-w-sm border border-slate-700 shadow-xl">
+          <div className="fixed inset-0 z-[104] bg-black/40" onClick={() => selectTile(null)} />
+          <div className="modal-above-hand fixed left-4 right-4 z-[105] bg-slate-800/95 rounded-xl p-3 mx-auto max-w-sm border border-slate-700 shadow-xl">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <span className="text-2xl">{selectedTile.emoji}</span>
