@@ -207,13 +207,13 @@ export function PlayerHand() {
   return (
     <div className="px-2 pb-3 pt-1">
       {/* Status area — fixed height to prevent layout shift when modal opens */}
-      <div className="h-7 flex items-center justify-center">
+      <div className="h-7 flex items-center justify-center relative z-[106]">
         {isRiichi && (
           <div className="text-center text-xs text-red-400 font-bold tracking-widest">
             RIICHI — hand locked
           </div>
         )}
-        {canRiichi && !selectedTile && !isRiichi && (
+        {canRiichi && !isRiichi && (
           <button
             onClick={() => declareRiichi(myPlayerId)}
             className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-red-600 to-red-500 text-white font-bold text-sm tracking-wider shadow-lg shadow-red-500/30 active:shadow-inner animate-pulse"
@@ -221,7 +221,7 @@ export function PlayerHand() {
             RIICHI!
           </button>
         )}
-        {isMyTurn && !selectedTile && !isRiichi && !canRiichi && (
+        {isMyTurn && !isRiichi && !canRiichi && !selectedTile && (
           <div className="text-center text-xs text-yellow-400 animate-pulse">
             Tap a tile to inspect
           </div>
