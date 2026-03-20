@@ -8,12 +8,33 @@ import { MarketRow } from '../board/MarketRow'
 import { PonButton } from '../hand/PonButton'
 import type { PlayerId } from '../../types'
 
+/** Small square tile backs representing face-down hand tiles */
 function TileBacks({ count }: { count: number }) {
   const shown = Math.min(count, 11)
   return (
-    <div className="flex flex-wrap gap-px max-w-[52px] justify-center">
+    <div className="flex flex-wrap gap-px max-w-[48px] justify-center">
       {Array.from({ length: shown }, (_, i) => (
-        <div key={i} className="w-2 h-3 bg-slate-600/80 rounded-[2px] border border-slate-500/50" />
+        <div key={i} className="w-[7px] h-[7px] bg-slate-600/80 rounded-[1px] border border-slate-500/40" />
+      ))}
+    </div>
+  )
+}
+
+/** Face-up revealed sets (pon) for an opponent */
+function OpponentMelds({ playerId }: { playerId: PlayerId }) {
+  const { revealedSets } = useGame()
+  const melds = revealedSets.filter(rs => rs.playerId === playerId)
+
+  if (melds.length === 0) return null
+
+  return (
+    <div className="flex gap-1 mt-0.5">
+      {melds.map((meld) => (
+        <div key={meld.tag} className="flex gap-px bg-amber-900/20 rounded px-0.5 py-0.5 border border-amber-500/30">
+          {meld.tiles.map((tile) => (
+            <span key={tile.id} className="text-[10px] leading-none">{tile.emoji}</span>
+          ))}
+        </div>
       ))}
     </div>
   )
@@ -37,6 +58,7 @@ function OpponentCompact({ playerId }: { playerId: PlayerId }) {
         {player.name.replace(' Bot', '')}
       </span>
       <TileBacks count={player.hand.length} />
+      <OpponentMelds playerId={playerId} />
       {player.riichi && <span className="text-[8px] text-red-400 font-bold">RIICHI</span>}
       {isActive && <span className="text-[8px] text-yellow-400">thinking...</span>}
     </div>
@@ -47,10 +69,8 @@ function CompassRose() {
   return (
     <div className="flex items-center justify-center opacity-[0.07] pointer-events-none select-none">
       <svg width="80" height="80" viewBox="0 0 100 100" fill="none">
-        {/* 4-pointed star */}
         <polygon points="50,5 55,45 95,50 55,55 50,95 45,55 5,50 45,45" fill="currentColor" className="text-slate-300" />
         <circle cx="50" cy="50" r="6" fill="currentColor" className="text-slate-400" />
-        {/* N/S/E/W labels */}
         <text x="50" y="4" textAnchor="middle" fill="currentColor" className="text-slate-300" fontSize="8" fontWeight="bold">N</text>
         <text x="50" y="99" textAnchor="middle" fill="currentColor" className="text-slate-300" fontSize="8" fontWeight="bold">S</text>
         <text x="99" y="53" textAnchor="end" fill="currentColor" className="text-slate-300" fontSize="8" fontWeight="bold">E</text>
@@ -144,18 +164,20 @@ export function GameScreen() {
 
         {/* Middle: West - compass - East */}
         <div className="flex-1 flex items-center justify-between px-1 min-h-0 relative">
+          {/* West: opponent + discards stacked vertically toward center */}
           <div className="flex items-center gap-1">
             <OpponentCompact playerId={west} />
-            <DiscardPool playerId={west} maxVisible={4} />
+            <DiscardPool playerId={west} maxVisible={4} vertical />
           </div>
 
-          {/* Compass centered absolutely so discards don't shift it */}
+          {/* Compass centered absolutely */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <CompassRose />
           </div>
 
+          {/* East: discards + opponent (discards toward center) */}
           <div className="flex items-center gap-1">
-            <DiscardPool playerId={east} maxVisible={4} />
+            <DiscardPool playerId={east} maxVisible={4} vertical />
             <OpponentCompact playerId={east} />
           </div>
         </div>
