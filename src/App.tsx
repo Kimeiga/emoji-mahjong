@@ -36,12 +36,11 @@ function SinglePlayerGame() {
 
   useAutoPlay('local')
 
-  // Auto-start
+  // Always start a fresh game when entering single player
   useEffect(() => {
-    if (phase === 'idle') {
-      startGame()
-    }
-  }, [phase, startGame])
+    startGame()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Auto-draw for human player
   useEffect(() => {
