@@ -1,5 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
-import { Reorder } from 'framer-motion'
+import { useMemo } from 'react'
 import { useGame } from '../../contexts/GameContext'
 import { TileView, TagPill } from '../shared/Tile'
 import { findDisplayTriplets } from '../../engine/triplet-display'
@@ -148,8 +147,6 @@ export function PlayerHand() {
     return hand.filter(t => !tripletTileIds.has(t.id) && !lockedTileIds.has(t.id))
   }, [hand, tripletTileIds, lockedTileIds])
 
-  const [orderedUngrouped, setOrderedUngrouped] = useState(ungrouped)
-  useEffect(() => { setOrderedUngrouped(ungrouped) }, [ungrouped])
 
   const canRiichi = useMemo(() => {
     if (isRiichi || !isMyTurn) return false
@@ -277,32 +274,25 @@ export function PlayerHand() {
           />
         ))}
 
-        {orderedUngrouped.length > 0 && (
-          <div className="flex flex-col items-center">
+        {ungrouped.length > 0 && (
+          <div className="flex flex-col items-center w-full">
             {triplets.length > 0 && (
               <div className="text-[9px] text-slate-500 mb-0.5">loose</div>
             )}
-            <Reorder.Group
-              axis="x"
-              values={orderedUngrouped}
-              onReorder={setOrderedUngrouped}
-              className="flex gap-1 justify-center"
-              style={{ listStyle: 'none' }}
-            >
-              {orderedUngrouped.map((tile) => (
-                <Reorder.Item key={tile.id} value={tile} style={{ cursor: 'grab' }}>
-                  <TileView
-                    tile={tile}
-                    size="lg"
-                    selected={selectedTileId === tile.id}
-                    highlighted={hasSelection && relatedTileIds.has(tile.id)}
-                    dimmed={hasSelection && tile.id !== selectedTileId && !relatedTileIds.has(tile.id)}
-                    newlyDrawn={tile.id === lastDrawnTileId}
-                    onClick={() => handleTap(tile.id)}
-                  />
-                </Reorder.Item>
+            <div className="flex flex-wrap gap-1 justify-center w-full">
+              {ungrouped.map((tile) => (
+                <TileView
+                  key={tile.id}
+                  tile={tile}
+                  size="lg"
+                  selected={selectedTileId === tile.id}
+                  highlighted={hasSelection && relatedTileIds.has(tile.id)}
+                  dimmed={hasSelection && tile.id !== selectedTileId && !relatedTileIds.has(tile.id)}
+                  newlyDrawn={tile.id === lastDrawnTileId}
+                  onClick={() => handleTap(tile.id)}
+                />
               ))}
-            </Reorder.Group>
+            </div>
           </div>
         )}
       </div>
