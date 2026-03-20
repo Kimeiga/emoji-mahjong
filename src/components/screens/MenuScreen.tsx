@@ -11,6 +11,21 @@ const difficulties: { value: AIDifficulty; label: string; desc: string }[] = [
   { value: 'hard', label: 'Hard', desc: 'Competitive' },
 ]
 
+const ADJECTIVES = [
+  'Swift', 'Bold', 'Lucky', 'Chill', 'Witty', 'Keen', 'Brave', 'Sly',
+  'Zappy', 'Deft', 'Plucky', 'Spry', 'Nifty', 'Peppy', 'Zippy', 'Jazzy',
+]
+const NOUNS = [
+  'Panda', 'Fox', 'Otter', 'Owl', 'Cat', 'Wolf', 'Hawk', 'Bear',
+  'Frog', 'Lynx', 'Crane', 'Hare', 'Moth', 'Newt', 'Crow', 'Seal',
+]
+
+function randomName(): string {
+  const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)]
+  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)]
+  return `${adj}${noun}`
+}
+
 export function MenuScreen() {
   const setScreen = useAppStore((s) => s.setScreen)
   const setRoomCode = useAppStore((s) => s.setRoomCode)
@@ -20,6 +35,7 @@ export function MenuScreen() {
   const setAiDifficulty = useAppStore((s) => s.setAiDifficulty)
   const applyServerMessage = useMultiplayerStore((s) => s.applyServerMessage)
 
+  const [playerName, setPlayerName] = useState(randomName)
   const [joinCode, setJoinCode] = useState('')
   const [showJoin, setShowJoin] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -29,7 +45,7 @@ export function MenuScreen() {
     const ws = connectToRoom(roomCode)
 
     ws.onopen = () => {
-      sendMessage(ws, { type: 'join', playerName: 'Player' })
+      sendMessage(ws, { type: 'join', playerName: playerName.trim() || randomName() })
       setWs(ws)
       setRoomCode(roomCode)
       setScreen('lobby')
@@ -147,6 +163,25 @@ export function MenuScreen() {
             <div className="flex-1 h-px bg-slate-700" />
             <span className="text-xs text-slate-500">or play online</span>
             <div className="flex-1 h-px bg-slate-700" />
+          </div>
+
+          {/* Player name */}
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={playerName}
+              onChange={(e) => setPlayerName(e.target.value)}
+              placeholder="Your name"
+              maxLength={16}
+              className="flex-1 px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-sky-500 transition-colors"
+            />
+            <button
+              onClick={() => setPlayerName(randomName())}
+              className="px-2.5 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-400 hover:text-white hover:border-slate-500 transition-colors text-sm"
+              title="Random name"
+            >
+              🎲
+            </button>
           </div>
 
           <motion.button
