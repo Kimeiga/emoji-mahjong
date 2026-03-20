@@ -122,13 +122,24 @@ function App() {
     return <TutorialOverlay onDone={() => setShowTutorial(false)} />
   }
 
-  switch (screen) {
-    case 'menu': return <MenuScreen />
-    case 'single-player': return <SinglePlayerGame />
-    case 'lobby': return <LobbyScreen />
-    case 'multiplayer-game': return <MultiplayerGame />
-    default: return <MenuScreen />
-  }
+  const content = (() => {
+    switch (screen) {
+      case 'menu': return <MenuScreen />
+      case 'single-player': return <SinglePlayerGame />
+      case 'lobby': return <LobbyScreen />
+      case 'multiplayer-game': return <MultiplayerGame />
+      default: return <MenuScreen />
+    }
+  })()
+
+  return (
+    <>
+      {content}
+      <div className="fixed bottom-1 right-2 text-[9px] text-slate-600/40 pointer-events-none z-0">
+        v24
+      </div>
+    </>
+  )
 }
 
 export default App

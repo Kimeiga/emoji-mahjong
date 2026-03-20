@@ -28,7 +28,7 @@ function MarketInspector({
   return (
     <>
       <div className="fixed inset-0 z-[100] bg-black/40" onClick={onClose} />
-      <div className="fixed left-4 right-4 z-[101] bg-slate-800/95 rounded-xl p-3 mx-auto max-w-sm border border-slate-700 shadow-xl" style={{ bottom: '65%' }}>
+      <div className="fixed left-4 right-4 z-[101] bg-slate-800/95 rounded-xl p-3 mx-auto max-w-sm border border-slate-700 shadow-xl" style={{ bottom: '40%' }}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <span className="text-2xl">{tile.emoji}</span>
