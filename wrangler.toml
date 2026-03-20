@@ -1,0 +1,14 @@
+name = "emoji-mahjong"
+main = "worker/index.ts"
+compatibility_date = "2025-01-01"
+
+[assets]
+directory = "dist"
+
+[[durable_objects.bindings]]
+name = "GAME_ROOM"
+class_name = "GameRoom"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["GameRoom"]

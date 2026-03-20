@@ -1,0 +1,425 @@
+[
+  {
+    "emoji": "😙",
+    "name": "kissing face with smiling eyes",
+    "group": "Smileys & Emotion",
+    "subgroup": "face-affection",
+    "tags": [
+      "closed",
+      "date",
+      "dating",
+      "flirt",
+      "kiss"
+    ]
+  },
+  {
+    "emoji": "💰",
+    "name": "money bag",
+    "group": "Objects",
+    "subgroup": "money",
+    "tags": [
+      "bank",
+      "billion",
+      "cash",
+      "dollar",
+      "money"
+    ]
+  },
+  {
+    "emoji": "🍷",
+    "name": "wine glass",
+    "group": "Food & Drink",
+    "subgroup": "drink",
+    "tags": [
+      "alcohol",
+      "bar",
+      "booze",
+      "drink",
+      "drinking"
+    ]
+  },
+  {
+    "emoji": "💧",
+    "name": "droplet",
+    "group": "Travel & Places",
+    "subgroup": "sky & weather",
+    "tags": [
+      "nature",
+      "water"
+    ]
+  },
+  {
+    "emoji": "🔮",
+    "name": "crystal ball",
+    "group": "Activities",
+    "subgroup": "game",
+    "tags": [
+      "ball",
+      "fairy",
+      "fairytale",
+      "fantasy",
+      "tale"
+    ]
+  },
+  {
+    "emoji": "💐",
+    "name": "bouquet",
+    "group": "Animals & Nature",
+    "subgroup": "plant-flower",
+    "tags": [
+      "anniversary",
+      "birthday",
+      "date",
+      "flower",
+      "love"
+    ]
+  },
+  {
+    "emoji": "🚺",
+    "name": "women’s room",
+    "group": "Symbols",
+    "subgroup": "transport-sign",
+    "tags": [
+      "bathroom",
+      "lavatory",
+      "restroom",
+      "toilet",
+      "wc"
+    ]
+  },
+  {
+    "emoji": "💕",
+    "name": "two hearts",
+    "group": "Smileys & Emotion",
+    "subgroup": "heart",
+    "tags": [
+      "anniversary",
+      "date",
+      "dating",
+      "emotion",
+      "heart"
+    ]
+  },
+  {
+    "emoji": "😚",
+    "name": "kissing face with closed eyes",
+    "group": "Smileys & Emotion",
+    "subgroup": "face-affection",
+    "tags": [
+      "closed",
+      "date",
+      "dating",
+      "flirt",
+      "kisses"
+    ]
+  },
+  {
+    "emoji": "💝",
+    "name": "heart with ribbon",
+    "group": "Smileys & Emotion",
+    "subgroup": "heart",
+    "tags": [
+      "anniversary",
+      "emotion",
+      "heart",
+      "kisses",
+      "valentine"
+    ]
+  },
+  {
+    "emoji": "💋",
+    "name": "kiss mark",
+    "group": "Smileys & Emotion",
+    "subgroup": "emotion",
+    "tags": [
+      "dating",
+      "emotion",
+      "heart",
+      "kiss",
+      "kissing"
+    ]
+  },
+  {
+    "emoji": "🍸",
+    "name": "cocktail glass",
+    "group": "Food & Drink",
+    "subgroup": "drink",
+    "tags": [
+      "alcohol",
+      "bar",
+      "booze",
+      "drink",
+      "drinking"
+    ]
+  },
+  {
+    "emoji": "🍹",
+    "name": "tropical drink",
+    "group": "Food & Drink",
+    "subgroup": "drink",
+    "tags": [
+      "alcohol",
+      "bar",
+      "booze",
+      "drink",
+      "drinking"
+    ]
+  },
+  {
+    "emoji": "💸",
+    "name": "money with wings",
+    "group": "Objects",
+    "subgroup": "money",
+    "tags": [
+      "bank",
+      "banknote",
+      "bill",
+      "billion",
+      "cash"
+    ]
+  },
+  {
+    "emoji": "💷",
+    "name": "pound banknote",
+    "group": "Objects",
+    "subgroup": "money",
+    "tags": [
+      "bank",
+      "banknote",
+      "bill",
+      "billion",
+      "cash"
+    ]
+  },
+  {
+    "emoji": "💵",
+    "name": "dollar banknote",
+    "group": "Objects",
+    "subgroup": "money",
+    "tags": [
+      "bank",
+      "banknote",
+      "bill",
+      "currency",
+      "dollar"
+    ]
+  },
+  {
+    "emoji": "😽",
+    "name": "kissing cat",
+    "group": "Smileys & Emotion",
+    "subgroup": "cat-face",
+    "tags": [
+      "closed",
+      "kiss",
+      "kissing"
+    ]
+  },
+  {
+    "emoji": "🚾",
+    "name": "water closet",
+    "group": "Symbols",
+    "subgroup": "transport-sign",
+    "tags": [
+      "bathroom",
+      "lavatory",
+      "restroom",
+      "toilet",
+      "water"
+    ]
+  },
+  {
+    "emoji": "🚹",
+    "name": "men’s room",
+    "group": "Symbols",
+    "subgroup": "transport-sign",
+    "tags": [
+      "bathroom",
+      "lavatory",
+      "restroom",
+      "toilet",
+      "wc"
+    ]
+  },
+  {
+    "emoji": "🌊",
+    "name": "water wave",
+    "group": "Travel & Places",
+    "subgroup": "sky & weather",
+    "tags": [
+      "nature",
+      "water"
+    ]
+  },
+  {
+    "emoji": "🌵",
+    "name": "cactus",
+    "group": "Animals & Nature",
+    "subgroup": "plant-other",
+    "tags": [
+      "nature",
+      "plant"
+    ]
+  },
+  {
+    "emoji": "🌹",
+    "name": "rose",
+    "group": "Animals & Nature",
+    "subgroup": "plant-flower",
+    "tags": [
+      "flower",
+      "love",
+      "plant",
+      "valentine"
+    ]
+  },
+  {
+    "emoji": "😈",
+    "name": "smiling face with horns",
+    "group": "Smileys & Emotion",
+    "subgroup": "face-negative",
+    "tags": [
+      "fairy",
+      "fairytale",
+      "fantasy",
+      "smile",
+      "tale"
+    ]
+  },
+  {
+    "emoji": "😇",
+    "name": "smiling face with halo",
+    "group": "Smileys & Emotion",
+    "subgroup": "face-smiling",
+    "tags": [
+      "fairy",
+      "fairytale",
+      "fantasy",
+      "happy",
+      "smile"
+    ]
+  },
+  {
+    "emoji": "🔍",
+    "name": "magnifying glass tilted left",
+    "group": "Objects",
+    "subgroup": "light & video",
+    "tags": [
+      "glass",
+      "tool"
+    ]
+  },
+  {
+    "emoji": "🔰",
+    "name": "Japanese symbol for beginner",
+    "group": "Symbols",
+    "subgroup": "other-symbol",
+    "tags": [
+      "japanese",
+      "tool"
+    ]
+  },
+  {
+    "emoji": "🎴",
+    "name": "flower playing cards",
+    "group": "Activities",
+    "subgroup": "game",
+    "tags": [
+      "flower",
+      "japanese"
+    ]
+  },
+  {
+    "emoji": "🍙",
+    "name": "rice ball",
+    "group": "Food & Drink",
+    "subgroup": "food-asian",
+    "tags": [
+      "ball",
+      "japanese"
+    ]
+  },
+  {
+    "emoji": "🎊",
+    "name": "confetti ball",
+    "group": "Activities",
+    "subgroup": "event",
+    "tags": [
+      "ball",
+      "celebrate",
+      "celebration",
+      "party"
+    ]
+  },
+  {
+    "emoji": "🎉",
+    "name": "party popper",
+    "group": "Activities",
+    "subgroup": "event",
+    "tags": [
+      "birthday",
+      "celebrate",
+      "celebration",
+      "party"
+    ]
+  },
+  {
+    "emoji": "🥳",
+    "name": "partying face",
+    "group": "Smileys & Emotion",
+    "subgroup": "face-hat",
+    "tags": [
+      "birthday",
+      "celebrate",
+      "celebration",
+      "happy",
+      "party"
+    ]
+  },
+  {
+    "emoji": "🎂",
+    "name": "birthday cake",
+    "group": "Food & Drink",
+    "subgroup": "food-sweet",
+    "tags": [
+      "birthday",
+      "celebration",
+      "happy"
+    ]
+  },
+  {
+    "emoji": "💲",
+    "name": "heavy dollar sign",
+    "group": "Symbols",
+    "subgroup": "currency",
+    "tags": [
+      "billion",
+      "cash",
+      "currency",
+      "dollar",
+      "money"
+    ]
+  },
+  {
+    "emoji": "🪭",
+    "name": "folding hand fan",
+    "group": "Objects",
+    "subgroup": "clothing",
+    "tags": [
+      "flirt"
+    ]
+  },
+  {
+    "emoji": "💘",
+    "name": "heart with arrow",
+    "group": "Smileys & Emotion",
+    "subgroup": "heart",
+    "tags": [
+      "date",
+      "emotion",
+      "heart",
+      "love",
+      "romance"
+    ]
+  }
+]
