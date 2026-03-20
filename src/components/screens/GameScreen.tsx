@@ -95,7 +95,7 @@ function RiichiToast() {
 }
 
 export function GameScreen() {
-  const { players, myPlayerId } = useGame()
+  const { myPlayerId } = useGame()
 
   // Determine opponent positions relative to myPlayerId
   const north = ((myPlayerId + 2) % 4) as PlayerId

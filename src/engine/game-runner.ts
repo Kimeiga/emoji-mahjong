@@ -11,7 +11,7 @@
 import type { Tile, Player, PlayerId, GamePhase } from '../types'
 import { HAND_SIZE, WIN_SIZE } from '../data/emojis'
 import { createDeck, drawTile as drawFromWall } from './deck'
-import { isWinningHand, sortByTag, findSharedTags, isTenpai, canDeclareRiichi, getWaitingTags } from './sets'
+import { isWinningHand, sortByTag, canDeclareRiichi } from './sets'
 import { calculateAIDiscard, shouldAIDeclareRiichi, shouldAICallPon, calculateRiichiDiscard } from './ai'
 import type { AIDifficulty } from '../multiplayer/protocol'
 
