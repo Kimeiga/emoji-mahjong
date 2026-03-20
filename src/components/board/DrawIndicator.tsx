@@ -1,7 +1,7 @@
 import { useGame } from '../../contexts/GameContext'
 
 export function DrawIndicator() {
-  const { wallCount, currentPlayer, turnCount, phase, myPlayerId, players, market } = useGame()
+  const { wallCount, currentPlayer, turnCount, phase, myPlayerId, players } = useGame()
 
   if (phase !== 'draw' && phase !== 'discard' && phase !== 'pon-available') return null
 
@@ -10,10 +10,14 @@ export function DrawIndicator() {
   const currentName = players[currentPlayer].name
 
   return (
-    <div className="flex justify-between items-center px-4 py-1.5">
-      <span className="text-xs text-slate-500">
-        Market: {market.length} | Wall: {wallCount}
-      </span>
+    <div className="relative flex items-center justify-center px-2 py-1.5">
+      {/* Left: Wall count */}
+      <div className="absolute left-2 flex flex-col items-center leading-none">
+        <span className="text-[9px] text-slate-500">Wall</span>
+        <span className="text-[11px] text-slate-400 font-bold">{wallCount}</span>
+      </div>
+
+      {/* Center: Status (visually centered) */}
       <span className={`
         text-xs font-bold px-3 py-0.5 rounded-full transition-all
         ${isMyTurn
@@ -21,11 +25,14 @@ export function DrawIndicator() {
           : 'text-slate-400'
         }
       `}>
-        {isMyDraw ? 'Pick from market or draw blind' : isMyTurn ? '\u2193 Your turn!' : `${currentName} thinking...`}
+        {isMyDraw ? 'Pick from market or draw blind' : isMyTurn ? '↓ Your turn!' : `${currentName} thinking...`}
       </span>
-      <span className="text-xs text-slate-500">
-        Round {turnCount}
-      </span>
+
+      {/* Right: Round */}
+      <div className="absolute right-2 flex flex-col items-center leading-none">
+        <span className="text-[9px] text-slate-500">Round</span>
+        <span className="text-[11px] text-slate-400 font-bold">{turnCount}</span>
+      </div>
     </div>
   )
 }
