@@ -1,4 +1,5 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
+import { Reorder } from 'framer-motion'
 import { useGame } from '../../contexts/GameContext'
 import { TileView, TagPill } from '../shared/Tile'
 import { findDisplayTriplets } from '../../engine/triplet-display'
@@ -147,6 +148,17 @@ export function PlayerHand() {
     return hand.filter(t => !tripletTileIds.has(t.id) && !lockedTileIds.has(t.id))
   }, [hand, tripletTileIds, lockedTileIds])
 
+  // Maintain ordered list for drag-to-reorder
+  const [orderedUngrouped, setOrderedUngrouped] = useState(ungrouped)
+  useEffect(() => {
+    // Sync when tiles change (draw, discard, pon) but preserve user's custom order
+    const currentIds = new Set(ungrouped.map(t => t.id))
+    const ordered = orderedUngrouped.filter(t => currentIds.has(t.id))
+    const newTiles = ungrouped.filter(t => !ordered.find(o => o.id === t.id))
+    if (newTiles.length > 0 || ordered.length !== orderedUngrouped.length) {
+      setOrderedUngrouped([...ordered, ...newTiles])
+    }
+  }, [ungrouped])
 
   const canRiichi = useMemo(() => {
     if (isRiichi || !isMyTurn) return false
@@ -273,25 +285,37 @@ export function PlayerHand() {
           />
         ))}
 
-        {ungrouped.length > 0 && (
+        {orderedUngrouped.length > 0 && (
           <div className="flex flex-col items-center w-full">
             {triplets.length > 0 && (
               <div className="text-[9px] text-slate-500 mb-0.5">loose</div>
             )}
-            <div className="flex flex-wrap gap-1 justify-center w-full">
-              {ungrouped.map((tile) => (
-                <TileView
+            <Reorder.Group
+              axis="x"
+              values={orderedUngrouped}
+              onReorder={setOrderedUngrouped}
+              className="flex gap-1 justify-center flex-wrap w-full"
+              style={{ listStyle: 'none' }}
+            >
+              {orderedUngrouped.map((tile) => (
+                <Reorder.Item
                   key={tile.id}
-                  tile={tile}
-                  size="lg"
-                  selected={selectedTileId === tile.id}
-                  highlighted={hasSelection && relatedTileIds.has(tile.id)}
-                  dimmed={hasSelection && tile.id !== selectedTileId && !relatedTileIds.has(tile.id)}
-                  newlyDrawn={tile.id === lastDrawnTileId}
-                  onClick={() => handleTap(tile.id)}
-                />
+                  value={tile}
+                  className="touch-none"
+                  whileDrag={{ scale: 1.1, zIndex: 50 }}
+                >
+                  <TileView
+                    tile={tile}
+                    size="lg"
+                    selected={selectedTileId === tile.id}
+                    highlighted={hasSelection && relatedTileIds.has(tile.id)}
+                    dimmed={hasSelection && tile.id !== selectedTileId && !relatedTileIds.has(tile.id)}
+                    newlyDrawn={tile.id === lastDrawnTileId}
+                    onClick={() => handleTap(tile.id)}
+                  />
+                </Reorder.Item>
               ))}
-            </div>
+            </Reorder.Group>
           </div>
         )}
       </div>
