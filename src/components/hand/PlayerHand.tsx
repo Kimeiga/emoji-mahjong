@@ -221,6 +221,17 @@ export function PlayerHand() {
                 ✕
               </button>
             </div>
+
+            {/* Discard button */}
+            {isMyTurn && (
+              <button
+                onClick={() => discardTile(selectedTile.id)}
+                className="w-full mt-2 mb-1 py-2 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 font-bold text-sm hover:bg-red-500/30 active:bg-red-500/40 transition-colors"
+              >
+                Discard {selectedTile.emoji}
+              </button>
+            )}
+
             <div className="space-y-1 max-h-36 overflow-y-auto">
               {tagRelations.slice(0, 8).map(({ tag, relatedTiles }) => (
                 <div key={tag} className="flex items-center gap-1.5 flex-wrap">
@@ -254,7 +265,7 @@ export function PlayerHand() {
       )}
 
       {/* Hand: locked sets, then formed triplets, then loose tiles */}
-      <div className="flex flex-wrap gap-3 justify-center max-w-md mx-auto items-end">
+      <div className="flex flex-wrap gap-3 justify-center max-w-md mx-auto items-end relative z-[102]">
         {/* Locked sets from pon */}
         {myLockedSets.map((rs) => (
           <LockedSetView key={rs.tag} tag={rs.tag} tiles={rs.tiles} />
