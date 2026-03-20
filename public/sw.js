@@ -1,10 +1,6 @@
-const CACHE_NAME = "emoji-mahjong-v1";
-const APP_SHELL = ["/"];
+const CACHE_NAME = "emoji-mahjong-v2";
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)),
-  );
+self.addEventListener("install", () => {
   self.skipWaiting();
 });
 
@@ -24,9 +20,8 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // Network-only for API routes
+  // Network-only for API/WebSocket routes
   if (url.pathname.startsWith("/api/")) {
-    event.respondWith(fetch(event.request));
     return;
   }
 
@@ -35,11 +30,10 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Cache-first for same-origin non-API requests
+  // Network-first: try network, fall back to cache (for offline support)
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((response) => {
+    fetch(event.request)
+      .then((response) => {
         if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -47,7 +41,9 @@ self.addEventListener("fetch", (event) => {
           });
         }
         return response;
-      });
-    }),
+      })
+      .catch(() => {
+        return caches.match(event.request);
+      }),
   );
 });
