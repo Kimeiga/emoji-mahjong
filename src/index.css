@@ -12,3 +12,39 @@ html, body, #root {
   -webkit-tap-highlight-color: transparent;
   user-select: none;
 }
+
+/* Modal anchored above the hand container */
+.hand-anchor {
+  anchor-name: --hand;
+}
+
+.modal-above-hand {
+  /* Fallback for browsers without anchor positioning */
+  bottom: 32%;
+}
+
+@supports (anchor-name: --hand) {
+  .modal-above-hand {
+    position-anchor: --hand;
+    bottom: anchor(top);
+    margin-bottom: 8px;
+  }
+}
+
+/* Modal anchored above the market row */
+.market-anchor {
+  anchor-name: --market;
+}
+
+.modal-above-market {
+  /* Fallback */
+  bottom: 52%;
+}
+
+@supports (anchor-name: --market) {
+  .modal-above-market {
+    position-anchor: --market;
+    bottom: anchor(top);
+    margin-bottom: 8px;
+  }
+}

@@ -28,7 +28,7 @@ function MarketInspector({
   return (
     <>
       <div className="fixed inset-0 z-[100] bg-black/40" onClick={onClose} />
-      <div className="fixed left-4 right-4 z-[101] bg-slate-800/95 rounded-xl p-3 mx-auto max-w-sm border border-slate-700 shadow-xl" style={{ bottom: '52%' }}>
+      <div className="modal-above-market fixed left-4 right-4 z-[101] bg-slate-800/95 rounded-xl p-3 mx-auto max-w-sm border border-slate-700 shadow-xl">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <span className="text-2xl">{tile.emoji}</span>
@@ -114,7 +114,7 @@ export function MarketRow() {
         />
       )}
 
-      <div className="flex flex-col items-center py-2 px-2">
+      <div className="market-anchor flex flex-col items-center py-2 px-2">
         <div className="text-[10px] text-slate-500 mb-1">
           {isMyDraw ? 'Tap a tile to inspect, then pick' : 'Market'}
         </div>
