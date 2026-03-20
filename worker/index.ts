@@ -2,15 +2,18 @@
  * Cloudflare Worker entry point for emoji-mahjong.
  *
  * Routes:
- *   POST /api/rooms         → create a room, return { code }
- *   GET  /api/rooms/:code/ws → WebSocket upgrade → GameRoom DO
- *   Everything else          → static assets (handled by wrangler [assets])
+ *   GET  /api/rooms           → list joinable rooms
+ *   POST /api/rooms           → create a room, return { code }
+ *   GET  /api/rooms/:code/ws  → WebSocket upgrade → GameRoom DO
+ *   Everything else           → static assets (handled by wrangler [assets])
  */
 
 export { GameRoom } from './game-room'
+export { RoomRegistry } from './room-registry'
 
 interface Env {
   GAME_ROOM: DurableObjectNamespace
+  ROOM_REGISTRY: DurableObjectNamespace
 }
 
 function generateRoomCode(): string {
@@ -20,9 +23,14 @@ function generateRoomCode(): string {
   return code
 }
 
+function getRegistry(env: Env) {
+  const id = env.ROOM_REGISTRY.idFromName('global')
+  return env.ROOM_REGISTRY.get(id)
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 }
 
@@ -35,9 +43,31 @@ export default {
       return new Response(null, { headers: corsHeaders })
     }
 
+    // GET /api/rooms — list joinable rooms
+    if (request.method === 'GET' && url.pathname === '/api/rooms') {
+      const registry = getRegistry(env)
+      const res = await registry.fetch(new Request('http://internal/list'))
+      const rooms = await res.json()
+      return Response.json(rooms, { headers: corsHeaders })
+    }
+
     // POST /api/rooms — create a new room
     if (request.method === 'POST' && url.pathname === '/api/rooms') {
       const code = generateRoomCode()
+
+      // Register in the room registry
+      const registry = getRegistry(env)
+      await registry.fetch(new Request('http://internal/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          code,
+          players: [],
+          playerCount: 0,
+          gameStarted: false,
+          createdAt: Date.now(),
+        }),
+      }))
+
       return Response.json({ code }, { status: 201, headers: corsHeaders })
     }
 

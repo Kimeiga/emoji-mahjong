@@ -6,6 +6,15 @@ import type { PlayerId } from '../types'
 
 export type AIDifficulty = 'easy' | 'medium' | 'hard'
 
+/** Room info returned by the server list */
+export interface RoomListEntry {
+  code: string
+  players: string[]
+  playerCount: number
+  gameStarted: boolean
+  createdAt: number
+}
+
 // ── Client → Server ──
 
 export type ClientMessage =

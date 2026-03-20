@@ -22,6 +22,10 @@ interface PlayerInfo {
   name: string
 }
 
+interface Env {
+  ROOM_REGISTRY: DurableObjectNamespace
+}
+
 export class GameRoom implements DurableObject {
   private players: Map<WebSocket, PlayerInfo> = new Map()
   private runner: GameRunner | null = null
@@ -30,9 +34,46 @@ export class GameRoom implements DurableObject {
   private lobbyPlayers: LobbyPlayer[] = []
   private gameStarted = false
   private ctx: DurableObjectState
+  private env: Env
 
-  constructor(ctx: DurableObjectState, _env: unknown) {
+  constructor(ctx: DurableObjectState, env: Env) {
     this.ctx = ctx
+    this.env = env
+  }
+
+  private async updateRegistry() {
+    try {
+      const registry = this.env.ROOM_REGISTRY.get(
+        this.env.ROOM_REGISTRY.idFromName('global')
+      )
+      const humanPlayers = this.lobbyPlayers.filter(p => p.isHuman && p.connected)
+      await registry.fetch(new Request('http://internal/update', {
+        method: 'POST',
+        body: JSON.stringify({
+          code: this.roomCode,
+          players: humanPlayers.map(p => p.name),
+          playerCount: humanPlayers.length,
+          gameStarted: this.gameStarted,
+          createdAt: Date.now(),
+        }),
+      }))
+    } catch {
+      // Non-critical, ignore
+    }
+  }
+
+  private async removeFromRegistry() {
+    try {
+      const registry = this.env.ROOM_REGISTRY.get(
+        this.env.ROOM_REGISTRY.idFromName('global')
+      )
+      await registry.fetch(new Request('http://internal/remove', {
+        method: 'POST',
+        body: JSON.stringify({ code: this.roomCode }),
+      }))
+    } catch {
+      // Non-critical
+    }
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -148,6 +189,7 @@ export class GameRoom implements DurableObject {
 
     this.send(ws, { type: 'assigned', playerId: seatId })
     this.broadcastRoomState()
+    this.updateRegistry()
   }
 
   private handleSetAIDifficulty(difficulty: AIDifficulty) {
@@ -187,6 +229,7 @@ export class GameRoom implements DurableObject {
 
     this.runner.start()
     this.gameStarted = true
+    this.updateRegistry()
 
     this.broadcastRoomState()
     this.broadcastGameState()
@@ -307,6 +350,9 @@ export class GameRoom implements DurableObject {
       this.runner = null
       this.gameStarted = false
       this.lobbyPlayers = []
+      this.removeFromRegistry()
+    } else {
+      this.updateRegistry()
     }
   }
 

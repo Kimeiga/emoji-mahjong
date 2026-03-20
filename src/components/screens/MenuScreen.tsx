@@ -1,14 +1,14 @@
-import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { useState, useEffect, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '../../store/app-store'
 import { useMultiplayerStore } from '../../store/multiplayer-store'
 import { connectToRoom, sendMessage, parseServerMessage, getApiUrl } from '../../multiplayer/client'
-import type { AIDifficulty } from '../../multiplayer/protocol'
+import type { AIDifficulty, RoomListEntry } from '../../multiplayer/protocol'
 
-const difficulties: { value: AIDifficulty; label: string; desc: string }[] = [
-  { value: 'easy', label: 'Easy', desc: 'Relaxed pace' },
-  { value: 'medium', label: 'Medium', desc: 'Balanced' },
-  { value: 'hard', label: 'Hard', desc: 'Competitive' },
+const difficulties: { value: AIDifficulty; label: string }[] = [
+  { value: 'easy', label: 'Easy' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'hard', label: 'Hard' },
 ]
 
 const ADJECTIVES = [
@@ -26,78 +26,183 @@ function randomName(): string {
   return `${adj}${noun}`
 }
 
-export function MenuScreen() {
+function ServerBrowser({ playerName, onBack }: { playerName: string; onBack: () => void }) {
   const setScreen = useAppStore((s) => s.setScreen)
   const setRoomCode = useAppStore((s) => s.setRoomCode)
   const setWs = useAppStore((s) => s.setWs)
   const setMyPlayerId = useAppStore((s) => s.setMyPlayerId)
-  const aiDifficulty = useAppStore((s) => s.aiDifficulty)
-  const setAiDifficulty = useAppStore((s) => s.setAiDifficulty)
   const applyServerMessage = useMultiplayerStore((s) => s.applyServerMessage)
 
-  const [playerName, setPlayerName] = useState(randomName)
-  const [joinCode, setJoinCode] = useState('')
-  const [showJoin, setShowJoin] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [rooms, setRooms] = useState<RoomListEntry[]>([])
+  const [loadingList, setLoadingList] = useState(true)
+  const [joining, setJoining] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  function connectAndNavigate(roomCode: string) {
-    const ws = connectToRoom(roomCode)
+  const fetchRooms = useCallback(async () => {
+    try {
+      const res = await fetch(getApiUrl('/api/rooms'))
+      if (res.ok) {
+        const data = await res.json() as RoomListEntry[]
+        setRooms(data)
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingList(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchRooms()
+    const interval = setInterval(fetchRooms, 3000)
+    return () => clearInterval(interval)
+  }, [fetchRooms])
+
+  function joinRoom(code: string) {
+    setJoining(code)
+    setError(null)
+    const ws = connectToRoom(code)
 
     ws.onopen = () => {
       sendMessage(ws, { type: 'join', playerName: playerName.trim() || randomName() })
       setWs(ws)
-      setRoomCode(roomCode)
+      setRoomCode(code)
       setScreen('lobby')
-      setLoading(false)
     }
 
     ws.onmessage = (event) => {
       const msg = parseServerMessage(event.data)
       if (!msg) return
-      if (msg.type === 'assigned') {
-        setMyPlayerId(msg.playerId)
-      }
+      if (msg.type === 'assigned') setMyPlayerId(msg.playerId)
       applyServerMessage(msg)
-      if (msg.type === 'game-state') {
-        setScreen('multiplayer-game')
-      }
+      if (msg.type === 'game-state') setScreen('multiplayer-game')
     }
 
     ws.onerror = () => {
-      setLoading(false)
-      setError('Connection failed. Please try again.')
+      setJoining(null)
+      setError('Could not connect to room')
     }
 
-    ws.onclose = () => {
-      setWs(null)
-    }
+    ws.onclose = () => setWs(null)
   }
 
-  async function handleCreateRoom() {
-    setLoading(true)
+  async function createRoom() {
+    setJoining('new')
     setError(null)
     try {
       const res = await fetch(getApiUrl('/api/rooms'), { method: 'POST' })
-      if (!res.ok) throw new Error('Failed to create room')
+      if (!res.ok) throw new Error()
       const { code } = await res.json()
-      connectAndNavigate(code)
+      joinRoom(code)
     } catch {
-      setLoading(false)
-      setError('Could not create room. Is the server running?')
+      setJoining(null)
+      setError('Could not create room')
     }
   }
 
-  function handleJoinRoom() {
-    const code = joinCode.trim().toUpperCase()
-    if (!code) return
-    setLoading(true)
-    setError(null)
-    connectAndNavigate(code)
-  }
+  return (
+    <div className="h-full flex flex-col items-center justify-center px-6">
+      <motion.div
+        initial={{ x: 50, opacity: 0 }}
+        animate={{ x: 0, opacity: 1 }}
+        transition={{ type: 'spring', damping: 20 }}
+        className="w-full max-w-sm"
+      >
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-5">
+          <button
+            onClick={onBack}
+            className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-600 flex items-center justify-center text-slate-400 hover:text-white hover:border-slate-500 transition-colors"
+          >
+            ←
+          </button>
+          <h2 className="text-xl font-bold text-white flex-1">Join a Room</h2>
+          <button
+            onClick={fetchRooms}
+            className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
 
-  function handleSinglePlayer() {
-    setScreen('single-player')
+        {/* Room list */}
+        <div className="space-y-2 mb-4 min-h-[200px] max-h-[320px] overflow-y-auto">
+          {loadingList && (
+            <div className="text-center text-sm text-slate-500 py-8">
+              Loading rooms...
+            </div>
+          )}
+
+          {!loadingList && rooms.length === 0 && (
+            <div className="text-center py-8">
+              <div className="text-3xl mb-2">🏜️</div>
+              <div className="text-sm text-slate-500">No rooms yet</div>
+              <div className="text-xs text-slate-600 mt-1">Create one and invite friends!</div>
+            </div>
+          )}
+
+          <AnimatePresence>
+            {rooms.map((room) => (
+              <motion.button
+                key={room.code}
+                initial={{ y: 10, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -10, opacity: 0 }}
+                onClick={() => joinRoom(room.code)}
+                disabled={joining !== null}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 hover:border-sky-500 hover:bg-slate-800/80 transition-all text-left disabled:opacity-50 group"
+              >
+                <div className="w-10 h-10 rounded-lg bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-lg group-hover:border-sky-500/60 transition-colors">
+                  🀄
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-white truncate">
+                      {room.players.length > 0 ? room.players.join(', ') : 'Empty room'}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">
+                    {room.playerCount}/4 players
+                  </div>
+                </div>
+                <div className="text-xs text-slate-500 group-hover:text-sky-400 transition-colors">
+                  {joining === room.code ? 'Joining...' : 'Join →'}
+                </div>
+              </motion.button>
+            ))}
+          </AnimatePresence>
+        </div>
+
+        {/* Create room button */}
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={createRoom}
+          disabled={joining !== null}
+          className="w-full py-3 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 text-white font-bold text-base tracking-wide shadow-lg shadow-blue-500/30 active:shadow-inner disabled:opacity-50 transition-all"
+        >
+          {joining === 'new' ? 'Creating...' : 'Create New Room'}
+        </motion.button>
+
+        {error && (
+          <div className="mt-3 text-center text-sm text-red-400 bg-red-500/10 rounded-lg px-3 py-2 border border-red-500/20">
+            {error}
+          </div>
+        )}
+      </motion.div>
+    </div>
+  )
+}
+
+export function MenuScreen() {
+  const setScreen = useAppStore((s) => s.setScreen)
+  const aiDifficulty = useAppStore((s) => s.aiDifficulty)
+  const setAiDifficulty = useAppStore((s) => s.setAiDifficulty)
+
+  const [playerName, setPlayerName] = useState(randomName)
+  const [showBrowser, setShowBrowser] = useState(false)
+
+  if (showBrowser) {
+    return <ServerBrowser playerName={playerName} onBack={() => setShowBrowser(false)} />
   }
 
   return (
@@ -152,9 +257,8 @@ export function MenuScreen() {
         <div className="flex flex-col gap-3">
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={handleSinglePlayer}
-            disabled={loading}
-            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-lg tracking-wide shadow-lg shadow-orange-500/30 active:shadow-inner disabled:opacity-50 transition-all"
+            onClick={() => setScreen('single-player')}
+            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-lg tracking-wide shadow-lg shadow-orange-500/30 active:shadow-inner transition-all"
           >
             Single Player
           </motion.button>
@@ -186,58 +290,12 @@ export function MenuScreen() {
 
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={handleCreateRoom}
-            disabled={loading}
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 text-white font-bold text-base tracking-wide shadow-lg shadow-blue-500/30 active:shadow-inner disabled:opacity-50 transition-all"
+            onClick={() => setShowBrowser(true)}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-sky-600 to-blue-600 text-white font-bold text-base tracking-wide shadow-lg shadow-blue-500/30 active:shadow-inner transition-all"
           >
-            {loading ? 'Connecting...' : 'Create Room'}
+            Multiplayer
           </motion.button>
-
-          {!showJoin ? (
-            <button
-              onClick={() => setShowJoin(true)}
-              className="w-full py-3 rounded-xl bg-slate-800 text-slate-300 font-medium text-base hover:bg-slate-700 transition-colors"
-            >
-              Join Room
-            </button>
-          ) : (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              className="flex gap-2"
-            >
-              <input
-                type="text"
-                value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                placeholder="ROOM CODE"
-                maxLength={6}
-                className="flex-1 px-4 py-3 rounded-xl bg-slate-800 border border-slate-600 text-white text-center font-mono text-lg tracking-widest placeholder:text-slate-600 focus:outline-none focus:border-amber-500 transition-colors"
-                onKeyDown={(e) => e.key === 'Enter' && handleJoinRoom()}
-                autoFocus
-              />
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                onClick={handleJoinRoom}
-                disabled={loading || !joinCode.trim()}
-                className="px-5 py-3 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold shadow-lg shadow-green-500/30 disabled:opacity-50 transition-all"
-              >
-                Go
-              </motion.button>
-            </motion.div>
-          )}
         </div>
-
-        {/* Error message */}
-        {error && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-4 text-center text-sm text-red-400 bg-red-500/10 rounded-lg px-3 py-2 border border-red-500/20"
-          >
-            {error}
-          </motion.div>
-        )}
       </motion.div>
     </div>
   )
