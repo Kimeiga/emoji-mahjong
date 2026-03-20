@@ -17,9 +17,9 @@ function OpponentCompact({ playerId }: { playerId: PlayerId }) {
 
   return (
     <div className={`
-      flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg text-center
-      ${isActive ? 'bg-yellow-400/15 ring-1 ring-yellow-400/40' : ''}
-      ${player.riichi ? 'ring-1 ring-red-500/60' : ''}
+      flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg text-center transition-all
+      ${isActive ? 'bg-yellow-400/15 ring-2 ring-yellow-400/50 scale-110' : ''}
+      ${player.riichi ? 'ring-2 ring-red-500/60' : ''}
     `}>
       <span className="text-lg">{player.isHuman ? '👤' : '🤖'}</span>
       <span className={`text-[10px] font-bold ${isActive ? 'text-yellow-300' : 'text-slate-400'}`}>
@@ -28,6 +28,7 @@ function OpponentCompact({ playerId }: { playerId: PlayerId }) {
       <div className="flex items-center gap-0.5">
         <span className="text-[10px] text-slate-500">{player.hand.length}</span>
         {player.riichi && <span className="text-[9px] text-red-400 font-bold">R</span>}
+        {isActive && <span className="text-[9px] text-yellow-400">💭</span>}
       </div>
     </div>
   )

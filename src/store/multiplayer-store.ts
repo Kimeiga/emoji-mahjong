@@ -153,8 +153,7 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
   selectTile: (tileId) => set({ selectedTileId: tileId }),
   clearPonEvent: () => set({ lastPonEvent: null }),
   clearRiichiEvent: () => set({ lastRiichiEvent: null }),
-  reset: () =>
-    set({
+  reset: () => set({
       phase: 'idle',
       players: [emptyPlayer(0), emptyPlayer(1), emptyPlayer(2), emptyPlayer(3)],
       wallCount: 0,

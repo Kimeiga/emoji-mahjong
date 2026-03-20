@@ -1,24 +1,31 @@
 import { type ServerMessage, type ClientMessage } from './protocol'
 
 /**
- * The Worker backend URL. In production, the static site is on pages.dev
- * while the multiplayer API is on workers.dev.
- * In dev, both are on the same origin (vite proxies to the worker).
+ * The Worker backend URL.
+ * When served from the Worker itself (workers.dev), use same origin.
+ * When served from Pages (pages.dev), connect to the Worker.
  */
-const WORKER_URL = import.meta.env.DEV
-  ? ''  // same origin in dev
-  : 'https://emoji-mahjong.hak7alp.workers.dev'
+function getWorkerOrigin(): string {
+  if (typeof location === 'undefined') return ''
+  // If we're on the worker URL already, use same origin
+  if (location.host.includes('workers.dev') || location.host.includes('localhost')) {
+    return ''
+  }
+  // Pages deployment → point to worker
+  return 'https://emoji-mahjong.hak7alp.workers.dev'
+}
 
 export function getApiUrl(path: string): string {
-  return `${WORKER_URL}${path}`
+  return `${getWorkerOrigin()}${path}`
 }
 
 export function connectToRoom(roomCode: string): WebSocket {
-  if (import.meta.env.DEV) {
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-    return new WebSocket(`${proto}//${location.host}/api/rooms/${roomCode}/ws`)
+  const origin = getWorkerOrigin()
+  if (origin) {
+    return new WebSocket(`wss://${origin.replace('https://', '')}/api/rooms/${roomCode}/ws`)
   }
-  return new WebSocket(`wss://emoji-mahjong.hak7alp.workers.dev/api/rooms/${roomCode}/ws`)
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return new WebSocket(`${proto}//${location.host}/api/rooms/${roomCode}/ws`)
 }
 
 export function sendMessage(ws: WebSocket, msg: ClientMessage) {

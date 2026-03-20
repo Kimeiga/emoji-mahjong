@@ -218,9 +218,17 @@ export class GameRunner {
 
   // ---- Actions ----
 
-  start(): GameSnapshot {
+  start(playerConfig?: { name: string; isHuman: boolean }[]): GameSnapshot {
     let wall = createDeck()
     const players = this.initialState().players
+
+    // Apply custom player configuration
+    if (playerConfig) {
+      for (let i = 0; i < Math.min(playerConfig.length, 4); i++) {
+        players[i].name = playerConfig[i].name
+        players[i].isHuman = playerConfig[i].isHuman
+      }
+    }
 
     // Deal HAND_SIZE (11) tiles to each player
     for (let round = 0; round < HAND_SIZE; round++) {

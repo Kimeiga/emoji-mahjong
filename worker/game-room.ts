@@ -217,17 +217,11 @@ export class GameRoom implements DurableObject {
     }
     this.lobbyPlayers.sort((a, b) => a.id - b.id)
 
-    // Create and configure the GameRunner
+    // Create and start the GameRunner with player config
     this.runner = new GameRunner({ aiDifficulty: this.aiDifficulty })
-
-    // Configure player names and human/AI status on the runner's state
-    const state = this.runner.getState()
-    for (const lp of this.lobbyPlayers) {
-      ;(state.players[lp.id] as any).name = lp.name
-      ;(state.players[lp.id] as any).isHuman = lp.isHuman
-    }
-
-    this.runner.start()
+    const sortedPlayers = [...this.lobbyPlayers].sort((a, b) => a.id - b.id)
+    const playerConfig = sortedPlayers.map(lp => ({ name: lp.name, isHuman: lp.isHuman }))
+    this.runner.start(playerConfig)
     this.gameStarted = true
     this.updateRegistry()
 
@@ -409,15 +403,19 @@ export class GameRoom implements DurableObject {
       myPlayerId: playerId,
       ponAvailable: snapshot.ponAvailable,
       revealedSets: snapshot.revealedSets,
-      players: snapshot.players.map((p) => ({
-        id: p.id,
-        name: p.name,
-        isHuman: p.isHuman,
-        riichi: p.riichi,
-        handSize: p.handSize,
-        hand: p.hand,
-        discards: p.discards,
-      })),
+      players: snapshot.players.map((p) => {
+        // Use lobby player names/isHuman (runner names may not persist)
+        const lp = this.lobbyPlayers.find(l => l.id === p.id)
+        return {
+          id: p.id,
+          name: lp?.name ?? p.name,
+          isHuman: lp?.isHuman ?? p.isHuman,
+          riichi: p.riichi,
+          handSize: p.handSize,
+          hand: p.hand,
+          discards: p.discards,
+        }
+      }),
     }
 
     this.send(ws, { type: 'game-state', state: view })
@@ -433,6 +431,10 @@ export class GameRoom implements DurableObject {
 
   // ── AI Turn Scheduling ──
 
+  private isHumanPlayer(id: PlayerId): boolean {
+    return this.lobbyPlayers.find(p => p.id === id)?.isHuman ?? false
+  }
+
   private scheduleAITurns() {
     if (!this.runner) return
     const state = this.runner.getState()
@@ -443,7 +445,7 @@ export class GameRoom implements DurableObject {
     // Handle AI pon decision
     if (state.phase === 'pon-available' && state.ponAvailable) {
       const ponPlayer = state.ponAvailable.playerId
-      if (!state.players[ponPlayer].isHuman) {
+      if (!this.isHumanPlayer(ponPlayer)) {
         setTimeout(() => this.handleAIPon(), 600)
         return
       }
@@ -452,14 +454,14 @@ export class GameRoom implements DurableObject {
     }
 
     // If current player is AI and it's their turn to act
-    const currentPlayer = state.players[state.currentPlayer]
-    if (!currentPlayer.isHuman) {
+    const isHuman = this.isHumanPlayer(state.currentPlayer)
+    if (!isHuman) {
       if (state.phase === 'draw') {
         setTimeout(() => this.handleAIDraw(), 600)
       } else if (state.phase === 'discard') {
         setTimeout(() => this.handleAIDiscard(), 800)
       }
-    } else if (currentPlayer.isHuman && state.phase === 'draw') {
+    } else if (isHuman && state.phase === 'draw') {
       // Auto-draw for human players
       try {
         this.runner.draw()
@@ -476,7 +478,7 @@ export class GameRoom implements DurableObject {
     if (state.phase !== 'pon-available' || !state.ponAvailable) return
 
     const ponPlayerId = state.ponAvailable.playerId
-    if (state.players[ponPlayerId].isHuman) return
+    if (this.isHumanPlayer(ponPlayerId)) return
 
     if (shouldAICallPon(this.aiDifficulty)) {
       const ponInfo = state.ponAvailable
@@ -508,7 +510,7 @@ export class GameRoom implements DurableObject {
     if (!this.runner) return
     const state = this.runner.getState()
     if (state.phase !== 'draw') return
-    if (state.players[state.currentPlayer].isHuman) return
+    if (this.isHumanPlayer(state.currentPlayer)) return
 
     try {
       this.runner.draw()
@@ -531,7 +533,7 @@ export class GameRoom implements DurableObject {
     if (state.phase !== 'discard') return
 
     const pid = state.currentPlayer
-    if (state.players[pid].isHuman) return
+    if (this.isHumanPlayer(pid)) return
 
     try {
       this.runner.aiTurn()
