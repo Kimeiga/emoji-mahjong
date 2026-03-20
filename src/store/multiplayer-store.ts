@@ -21,6 +21,9 @@ interface MultiplayerState {
   roomCode: string
   aiDifficulty: AIDifficulty
 
+  // Rematch
+  rematchVotes: { count: number; total: number } | null
+
   // Toast events
   lastPonEvent: { playerName: string; emoji: string; tag: string } | null
   lastRiichiEvent: { playerName: string } | null
@@ -106,6 +109,8 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
   roomCode: '',
   aiDifficulty: 'medium',
 
+  rematchVotes: null,
+
   lastPonEvent: null,
   lastRiichiEvent: null,
 
@@ -144,6 +149,25 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
       case 'error':
         console.error('[multiplayer] Server error:', msg.message)
         break
+      case 'rematch-votes':
+        set({ rematchVotes: { count: msg.count, total: msg.total } })
+        break
+      case 'rematch-starting':
+        set({
+          phase: 'idle',
+          players: [emptyPlayer(0), emptyPlayer(1), emptyPlayer(2), emptyPlayer(3)],
+          wallCount: 0,
+          currentPlayer: 0 as PlayerId,
+          turnCount: 0,
+          selectedTileId: null,
+          winner: null,
+          ponAvailable: null,
+          revealedSets: [],
+          rematchVotes: null,
+          lastPonEvent: null,
+          lastRiichiEvent: null,
+        })
+        break
       case 'assigned':
         // Handled in the App level (sets myPlayerId on app-store)
         break
@@ -165,6 +189,7 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
       revealedSets: [],
       lobbyPlayers: [],
       gameStarted: false,
+      rematchVotes: null,
       lastPonEvent: null,
       lastRiichiEvent: null,
     }),

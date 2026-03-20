@@ -8,6 +8,7 @@ interface TileProps {
   selected?: boolean
   dimmed?: boolean
   highlighted?: boolean
+  newlyDrawn?: boolean
   onClick?: () => void
   layoutId?: string
 }
@@ -18,7 +19,7 @@ const sizes = {
   lg: 'w-14 h-14 text-4xl',
 }
 
-export function TileView({ tile, size = 'md', selected, dimmed, highlighted, onClick, layoutId }: TileProps) {
+export function TileView({ tile, size = 'md', selected, dimmed, highlighted, newlyDrawn, onClick, layoutId }: TileProps) {
   const primaryColor = getTagColor(tile.tags[0] || 'default')
 
   return (
@@ -35,7 +36,9 @@ export function TileView({ tile, size = 'md', selected, dimmed, highlighted, onC
             ? 'border-sky-400 bg-sky-400/10 ring-1 ring-sky-400/30'
             : dimmed
               ? 'border-slate-700 bg-slate-900 opacity-40'
-              : 'border-slate-600 bg-slate-800 hover:border-slate-400'
+              : newlyDrawn
+                ? 'border-sky-400 bg-sky-400/10 ring-2 ring-sky-400/50'
+                : 'border-slate-600 bg-slate-800 hover:border-slate-400'
         }
       `}
       style={!selected ? {
@@ -43,6 +46,10 @@ export function TileView({ tile, size = 'md', selected, dimmed, highlighted, onC
         borderBottomWidth: '3px',
       } : undefined}
       whileTap={{ scale: 0.92 }}
+      animate={newlyDrawn ? {
+        boxShadow: ['0 0 0px rgba(56,189,248,0)', '0 0 12px rgba(56,189,248,0.5)', '0 0 0px rgba(56,189,248,0)'],
+      } : undefined}
+      transition={newlyDrawn ? { duration: 1, repeat: 1 } : undefined}
       layout
     >
       <span className="leading-none">{tile.emoji}</span>
@@ -50,7 +57,6 @@ export function TileView({ tile, size = 'md', selected, dimmed, highlighted, onC
   )
 }
 
-/** Tag pill with proper contrast */
 export function TagPill({ tag, count }: { tag: string; count?: number }) {
   const { bg, text } = getTagColor(tag)
   return (

@@ -2,22 +2,10 @@ import { create } from 'zustand'
 import type { GameState, Player, PlayerId, Tile } from '../types'
 import { GameRunner } from '../engine/game-runner'
 
-/**
- * Zustand store that wraps GameRunner for React integration.
- * The GameRunner is also exposed on window.__game for console/agent access.
- */
-
 const runner = new GameRunner()
 
-// Expose on window for console/agent play
 if (typeof window !== 'undefined') {
   ;(window as any).__game = runner
-  ;(window as any).__gameHelp = () => console.log(runner.help())
-  console.log(
-    '%c🀄 Semantic Mahjong',
-    'font-size: 16px; font-weight: bold',
-    '\nType __game.help() for console commands'
-  )
 }
 
 interface GameActions {
@@ -31,12 +19,12 @@ interface GameActions {
   declareRiichi: (playerId: PlayerId) => void
   resetGame: () => void
   syncFromRunner: () => void
-  /** Last pon event for toast display */
   lastPonEvent: { playerName: string; emoji: string; tag: string } | null
   clearPonEvent: () => void
-  /** Last riichi event for toast display */
   lastRiichiEvent: { playerName: string } | null
   clearRiichiEvent: () => void
+  lastDrawnTileId: string | null
+  gameStartTime: number
 }
 
 type Store = GameState & GameActions
@@ -66,7 +54,6 @@ function stateFromRunner(): GameState {
 }
 
 export const useGameStore = create<Store>((set) => {
-  // Sync React state whenever runner emits state changes
   runner.on((event) => {
     if (event === 'state-changed') {
       set(stateFromRunner())
@@ -77,31 +64,36 @@ export const useGameStore = create<Store>((set) => {
     ...stateFromRunner(),
     lastPonEvent: null,
     lastRiichiEvent: null,
+    lastDrawnTileId: null,
+    gameStartTime: Date.now(),
 
     startGame: () => {
       runner.start()
-      set({ ...stateFromRunner(), lastPonEvent: null, lastRiichiEvent: null })
+      set({ ...stateFromRunner(), lastPonEvent: null, lastRiichiEvent: null, gameStartTime: Date.now() })
     },
 
     drawCurrentPlayer: () => {
       try {
         runner.draw()
-        set(stateFromRunner())
+        const drawnId = runner.getState().lastDrawnTileId
+        set({ ...stateFromRunner(), lastDrawnTileId: drawnId })
+        // Clear drawn highlight after 1.5s
+        if (drawnId) {
+          setTimeout(() => set({ lastDrawnTileId: null }), 1500)
+        }
       } catch {
-        // ignore if not in draw phase
+        // ignore
       }
     },
 
-    selectTile: (tileId) => {
-      set({ selectedTileId: tileId })
-    },
+    selectTile: (tileId) => set({ selectedTileId: tileId }),
 
     discardTile: (tileId) => {
       try {
         runner.discard(tileId)
-        set(stateFromRunner())
+        set({ ...stateFromRunner(), lastDrawnTileId: null })
       } catch {
-        // ignore invalid discards
+        // ignore
       }
     },
 
@@ -110,7 +102,7 @@ export const useGameStore = create<Store>((set) => {
         runner.aiTurn()
         set(stateFromRunner())
       } catch {
-        // ignore if not AI's turn
+        // ignore
       }
     },
 
@@ -125,7 +117,7 @@ export const useGameStore = create<Store>((set) => {
         runner.callPon(playerId)
         set({ ...stateFromRunner(), lastPonEvent: { playerName, emoji, tag } })
       } catch {
-        // ignore invalid pon calls
+        // ignore
       }
     },
 
@@ -144,7 +136,7 @@ export const useGameStore = create<Store>((set) => {
         runner.declareRiichi(playerId)
         set({ ...stateFromRunner(), lastRiichiEvent: { playerName } })
       } catch {
-        // ignore invalid riichi declarations
+        // ignore
       }
     },
 
@@ -153,17 +145,9 @@ export const useGameStore = create<Store>((set) => {
       set({ ...stateFromRunner(), lastPonEvent: null, lastRiichiEvent: null })
     },
 
-    syncFromRunner: () => {
-      set(stateFromRunner())
-    },
-
-    clearPonEvent: () => {
-      set({ lastPonEvent: null })
-    },
-
-    clearRiichiEvent: () => {
-      set({ lastRiichiEvent: null })
-    },
+    syncFromRunner: () => set(stateFromRunner()),
+    clearPonEvent: () => set({ lastPonEvent: null }),
+    clearRiichiEvent: () => set({ lastRiichiEvent: null }),
   }
 })
 

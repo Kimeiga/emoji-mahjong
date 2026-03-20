@@ -33,6 +33,7 @@ export class GameRoom implements DurableObject {
   private aiDifficulty: AIDifficulty = 'medium'
   private lobbyPlayers: LobbyPlayer[] = []
   private gameStarted = false
+  private rematchVotes: Set<PlayerId> = new Set()
   private ctx: DurableObjectState
   private env: Env
 
@@ -134,6 +135,9 @@ export class GameRoom implements DurableObject {
         break
       case 'declare-riichi':
         this.handleDeclareRiichi(ws)
+        break
+      case 'rematch':
+        this.handleRematch(ws)
         break
       default:
         this.send(ws, { type: 'error', message: `Unknown message type` })
@@ -324,6 +328,32 @@ export class GameRoom implements DurableObject {
     }
 
     this.broadcastGameState()
+  }
+
+  private handleRematch(ws: WebSocket) {
+    const info = this.players.get(ws)
+    if (!info) return
+
+    this.rematchVotes.add(info.playerId)
+
+    const humanCount = this.lobbyPlayers.filter(p => p.isHuman && p.connected).length
+    this.broadcast({ type: 'rematch-votes', count: this.rematchVotes.size, total: humanCount })
+
+    if (this.rematchVotes.size >= humanCount) {
+      this.rematchVotes.clear()
+
+      // Create a new GameRunner with the same config
+      this.runner = new GameRunner({ aiDifficulty: this.aiDifficulty })
+      const sortedPlayers = [...this.lobbyPlayers].sort((a, b) => a.id - b.id)
+      const playerConfig = sortedPlayers.map(lp => ({ name: lp.name, isHuman: lp.isHuman }))
+      this.runner.start(playerConfig)
+      this.gameStarted = true
+
+      this.broadcast({ type: 'rematch-starting' })
+      this.broadcastRoomState()
+      this.broadcastGameState()
+      this.scheduleAITurns()
+    }
   }
 
   private handleDisconnect(ws: WebSocket) {

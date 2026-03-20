@@ -25,6 +25,7 @@ export type ClientMessage =
   | { type: 'call-pon' }
   | { type: 'decline-pon' }
   | { type: 'declare-riichi' }
+  | { type: 'rematch' }
 
 // ── Server → Client ──
 
@@ -79,3 +80,5 @@ export type ServerMessage =
   | { type: 'player-left'; playerId: PlayerId }
   | { type: 'error'; message: string }
   | { type: 'assigned'; playerId: PlayerId }
+  | { type: 'rematch-votes'; count: number; total: number }
+  | { type: 'rematch-starting' }

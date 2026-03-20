@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useAppStore } from './store/app-store'
 import { useGameStore } from './store/game-store'
 import { useMultiplayerStore } from './store/multiplayer-store'
@@ -9,6 +9,7 @@ import { MenuScreen } from './components/screens/MenuScreen'
 import { LobbyScreen } from './components/screens/LobbyScreen'
 import { GameScreen } from './components/screens/GameScreen'
 import { ResultScreen } from './components/screens/ResultScreen'
+import TutorialOverlay from './components/screens/TutorialOverlay'
 import type { PlayerId } from './types'
 
 function SinglePlayerGame() {
@@ -23,6 +24,8 @@ function SinglePlayerGame() {
   const revealedSets = useGameStore((s) => s.revealedSets)
   const lastPonEvent = useGameStore((s) => s.lastPonEvent)
   const lastRiichiEvent = useGameStore((s) => s.lastRiichiEvent)
+  const lastDrawnTileId = useGameStore((s) => s.lastDrawnTileId)
+  const gameStartTime = useGameStore((s) => s.gameStartTime)
 
   const selectTile = useGameStore((s) => s.selectTile)
   const discardTile = useGameStore((s) => s.discardTile)
@@ -36,43 +39,26 @@ function SinglePlayerGame() {
 
   useAutoPlay('local')
 
-  // Always start a fresh game when entering single player
   useEffect(() => {
     startGame()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Auto-draw for human player
   useEffect(() => {
     if (currentPlayer === 0 && phase === 'draw') {
-      const timer = setTimeout(() => {
-        drawCurrentPlayer()
-      }, 400)
+      const timer = setTimeout(() => drawCurrentPlayer(), 400)
       return () => clearTimeout(timer)
     }
   }, [currentPlayer, phase, drawCurrentPlayer])
 
   const ctx: GameContextValue = {
     mode: 'local',
-    phase,
-    players,
-    wallCount: wall.length,
-    currentPlayer,
-    turnCount,
-    selectedTileId,
-    winner,
-    ponAvailable,
-    revealedSets,
+    phase, players, wallCount: wall.length, currentPlayer, turnCount,
+    selectedTileId, winner, ponAvailable, revealedSets,
     myPlayerId: 0 as PlayerId,
-    selectTile,
-    discardTile,
-    callPon,
-    declinePon,
-    declareRiichi,
-    lastPonEvent,
-    lastRiichiEvent,
-    clearPonEvent,
-    clearRiichiEvent,
+    lastDrawnTileId, gameStartTime,
+    selectTile, discardTile, callPon, declinePon, declareRiichi,
+    lastPonEvent, lastRiichiEvent, clearPonEvent, clearRiichiEvent,
   }
 
   return (
@@ -104,33 +90,15 @@ function MultiplayerGame() {
 
   const ctx: GameContextValue = {
     mode: 'multiplayer',
-    phase,
-    players,
-    wallCount,
-    currentPlayer,
-    turnCount,
-    selectedTileId,
-    winner,
-    ponAvailable,
-    revealedSets,
-    myPlayerId,
+    phase, players, wallCount, currentPlayer, turnCount,
+    selectedTileId, winner, ponAvailable, revealedSets, myPlayerId,
+    lastDrawnTileId: null, gameStartTime: Date.now(),
     selectTile,
-    discardTile: (id: string) => {
-      if (ws) sendMessage(ws, { type: 'discard', tileId: id })
-    },
-    callPon: (_playerId: PlayerId) => {
-      if (ws) sendMessage(ws, { type: 'call-pon' })
-    },
-    declinePon: () => {
-      if (ws) sendMessage(ws, { type: 'decline-pon' })
-    },
-    declareRiichi: (_playerId: PlayerId) => {
-      if (ws) sendMessage(ws, { type: 'declare-riichi' })
-    },
-    lastPonEvent,
-    lastRiichiEvent,
-    clearPonEvent,
-    clearRiichiEvent,
+    discardTile: (id: string) => { if (ws) sendMessage(ws, { type: 'discard', tileId: id }) },
+    callPon: () => { if (ws) sendMessage(ws, { type: 'call-pon' }) },
+    declinePon: () => { if (ws) sendMessage(ws, { type: 'decline-pon' }) },
+    declareRiichi: () => { if (ws) sendMessage(ws, { type: 'declare-riichi' }) },
+    lastPonEvent, lastRiichiEvent, clearPonEvent, clearRiichiEvent,
   }
 
   return (
@@ -142,18 +110,20 @@ function MultiplayerGame() {
 
 function App() {
   const screen = useAppStore((s) => s.screen)
+  const [showTutorial, setShowTutorial] = useState(
+    () => !localStorage.getItem('emoji-mahjong-tutorial-seen')
+  )
+
+  if (showTutorial) {
+    return <TutorialOverlay onDone={() => setShowTutorial(false)} />
+  }
 
   switch (screen) {
-    case 'menu':
-      return <MenuScreen />
-    case 'single-player':
-      return <SinglePlayerGame />
-    case 'lobby':
-      return <LobbyScreen />
-    case 'multiplayer-game':
-      return <MultiplayerGame />
-    default:
-      return <MenuScreen />
+    case 'menu': return <MenuScreen />
+    case 'single-player': return <SinglePlayerGame />
+    case 'lobby': return <LobbyScreen />
+    case 'multiplayer-game': return <MultiplayerGame />
+    default: return <MenuScreen />
   }
 }
 

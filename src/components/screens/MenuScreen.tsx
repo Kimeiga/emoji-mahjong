@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '../../store/app-store'
 import { useMultiplayerStore } from '../../store/multiplayer-store'
 import { connectToRoom, sendMessage, parseServerMessage, getApiUrl } from '../../multiplayer/client'
+import { getSession, saveSession, clearSession } from '../../utils/session'
+import { getStats } from '../../utils/stats'
 import type { AIDifficulty, RoomListEntry } from '../../multiplayer/protocol'
 
 const difficulties: { value: AIDifficulty; label: string }[] = [
@@ -73,7 +75,10 @@ function ServerBrowser({ playerName, onBack }: { playerName: string; onBack: () 
     ws.onmessage = (event) => {
       const msg = parseServerMessage(event.data)
       if (!msg) return
-      if (msg.type === 'assigned') setMyPlayerId(msg.playerId)
+      if (msg.type === 'assigned') {
+        setMyPlayerId(msg.playerId)
+        saveSession({ roomCode: code, playerName: playerName.trim() || 'Player', myPlayerId: msg.playerId })
+      }
       applyServerMessage(msg)
       if (msg.type === 'game-state') setScreen('multiplayer-game')
     }
@@ -193,25 +198,112 @@ function ServerBrowser({ playerName, onBack }: { playerName: string; onBack: () 
   )
 }
 
+const FLOATING_EMOJI = ['🀄','🎴','🐱','🌸','🎲','🍜','🏯','🎋','🐉','🎎','🌙','🎏','🍵','🦊','🌺','🎑']
+
+function FloatingBackground() {
+  return (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+      {FLOATING_EMOJI.map((emoji, i) => (
+        <motion.div
+          key={i}
+          className="absolute text-2xl opacity-[0.06]"
+          style={{
+            left: `${(i * 17 + 5) % 90}%`,
+            top: `${(i * 23 + 10) % 85}%`,
+          }}
+          animate={{
+            y: [0, -30, 0],
+            rotate: [0, 10, -10, 0],
+          }}
+          transition={{
+            duration: 6 + (i % 4) * 2,
+            repeat: Infinity,
+            delay: i * 0.4,
+            ease: 'easeInOut',
+          }}
+        >
+          {emoji}
+        </motion.div>
+      ))}
+    </div>
+  )
+}
+
 export function MenuScreen() {
   const setScreen = useAppStore((s) => s.setScreen)
+  const setWs = useAppStore((s) => s.setWs)
+  const setRoomCode = useAppStore((s) => s.setRoomCode)
+  const setMyPlayerId = useAppStore((s) => s.setMyPlayerId)
   const aiDifficulty = useAppStore((s) => s.aiDifficulty)
   const setAiDifficulty = useAppStore((s) => s.setAiDifficulty)
+  const applyServerMessage = useMultiplayerStore((s) => s.applyServerMessage)
 
   const [playerName, setPlayerName] = useState(randomName)
   const [showBrowser, setShowBrowser] = useState(false)
+  const [reconnecting, setReconnecting] = useState(false)
+  const stats = getStats()
+
+  // Check for saved session to reconnect
+  useEffect(() => {
+    const session = getSession()
+    if (session) {
+      setReconnecting(true)
+      const ws = connectToRoom(session.roomCode)
+      ws.onopen = () => {
+        sendMessage(ws, { type: 'join', playerName: session.playerName })
+        setWs(ws)
+        setRoomCode(session.roomCode)
+        setMyPlayerId(session.myPlayerId)
+      }
+      ws.onmessage = (event) => {
+        const msg = parseServerMessage(event.data)
+        if (!msg) return
+        if (msg.type === 'assigned') setMyPlayerId(msg.playerId)
+        applyServerMessage(msg)
+        if (msg.type === 'game-state') {
+          setScreen('multiplayer-game')
+          setReconnecting(false)
+        }
+        if (msg.type === 'room-state') {
+          setScreen('lobby')
+          setReconnecting(false)
+        }
+      }
+      ws.onerror = () => {
+        clearSession()
+        setReconnecting(false)
+      }
+      ws.onclose = () => {
+        setWs(null)
+        setReconnecting(false)
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  if (reconnecting) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-3 animate-pulse">🀄</div>
+          <div className="text-sm text-slate-400">Reconnecting to game...</div>
+        </div>
+      </div>
+    )
+  }
 
   if (showBrowser) {
     return <ServerBrowser playerName={playerName} onBack={() => setShowBrowser(false)} />
   }
 
   return (
-    <div className="h-full flex flex-col items-center justify-center px-6">
+    <div className="h-full flex flex-col items-center justify-center px-6 relative">
+      <FloatingBackground />
       <motion.div
         initial={{ y: -30, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: 'spring', damping: 20, stiffness: 200 }}
-        className="w-full max-w-sm"
+        className="w-full max-w-sm relative z-10"
       >
         {/* Title */}
         <div className="text-center mb-8">
@@ -229,6 +321,11 @@ export function MenuScreen() {
           <p className="text-sm text-slate-400 mt-1">
             Match emoji by semantic tags
           </p>
+          {stats.gamesPlayed > 0 && (
+            <p className="text-[11px] text-slate-500 mt-2">
+              {stats.wins}W / {stats.losses}L / {stats.draws}D
+            </p>
+          )}
         </div>
 
         {/* AI Difficulty selector */}

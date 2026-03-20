@@ -13,6 +13,8 @@ export interface GameContextValue {
   ponAvailable: PonInfo | null
   revealedSets: RevealedSet[]
   myPlayerId: PlayerId
+  lastDrawnTileId: string | null
+  gameStartTime: number
 
   // Actions
   selectTile: (id: string | null) => void
