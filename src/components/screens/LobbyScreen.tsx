@@ -19,22 +19,12 @@ export function LobbyScreen() {
   const lobbyPlayers = useMultiplayerStore((s) => s.lobbyPlayers)
   const aiDifficulty = useMultiplayerStore((s) => s.aiDifficulty)
 
-  const isHost = myPlayerId === 0
-
   function handleChangeDifficulty(d: AIDifficulty) {
-    if (ws) {
-      sendMessage(ws, { type: 'set-ai-difficulty', difficulty: d })
-    }
+    if (ws) sendMessage(ws, { type: 'set-ai-difficulty', difficulty: d })
   }
 
   function handleStart() {
-    if (ws) {
-      sendMessage(ws, { type: 'start' })
-    }
-  }
-
-  function handleLeave() {
-    disconnect()
+    if (ws) sendMessage(ws, { type: 'start' })
   }
 
   // Build 4 slots
@@ -99,53 +89,44 @@ export function LobbyScreen() {
                   <div className="text-[10px] text-green-400">Connected</div>
                 )}
               </div>
-              {i === 0 && player && (
-                <span className="text-[10px] text-amber-400 font-bold px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">
-                  HOST
-                </span>
-              )}
             </motion.div>
           ))}
         </div>
 
         {/* AI Difficulty */}
-        {isHost && (
-          <div className="mb-6">
-            <div className="text-xs text-slate-500 text-center mb-2">AI Difficulty</div>
-            <div className="flex gap-2 justify-center">
-              {difficulties.map((d) => (
-                <button
-                  key={d.value}
-                  onClick={() => handleChangeDifficulty(d.value)}
-                  className={`
-                    px-3 py-1.5 rounded-lg text-sm font-medium transition-all
-                    ${aiDifficulty === d.value
-                      ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
-                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-300'
-                    }
-                  `}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
+        <div className="mb-6">
+          <div className="text-xs text-slate-500 text-center mb-2">AI Difficulty</div>
+          <div className="flex gap-2 justify-center">
+            {difficulties.map((d) => (
+              <button
+                key={d.value}
+                onClick={() => handleChangeDifficulty(d.value)}
+                className={`
+                  px-3 py-1.5 rounded-lg text-sm font-medium transition-all
+                  ${aiDifficulty === d.value
+                    ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
+                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-300'
+                  }
+                `}
+              >
+                {d.label}
+              </button>
+            ))}
           </div>
-        )}
+        </div>
 
         {/* Action buttons */}
         <div className="flex flex-col gap-3">
-          {isHost && (
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={handleStart}
-              className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-lg tracking-wide shadow-lg shadow-orange-500/30 active:shadow-inner transition-all"
-            >
-              Start Game
-            </motion.button>
-          )}
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={handleStart}
+            className="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-lg tracking-wide shadow-lg shadow-orange-500/30 active:shadow-inner transition-all"
+          >
+            Start Game
+          </motion.button>
 
           <button
-            onClick={handleLeave}
+            onClick={() => disconnect()}
             className="w-full py-2.5 rounded-xl bg-slate-800 text-slate-400 font-medium hover:bg-slate-700 hover:text-slate-300 transition-colors"
           >
             Leave
