@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useAppStore } from '../../store/app-store'
 import { useMultiplayerStore } from '../../store/multiplayer-store'
-import { connectToRoom, sendMessage, parseServerMessage } from '../../multiplayer/client'
+import { connectToRoom, sendMessage, parseServerMessage, getApiUrl } from '../../multiplayer/client'
 import type { AIDifficulty } from '../../multiplayer/protocol'
 
 const difficulties: { value: AIDifficulty; label: string; desc: string }[] = [
@@ -62,7 +62,7 @@ export function MenuScreen() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/rooms', { method: 'POST' })
+      const res = await fetch(getApiUrl('/api/rooms'), { method: 'POST' })
       if (!res.ok) throw new Error('Failed to create room')
       const { code } = await res.json()
       connectAndNavigate(code)

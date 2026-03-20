@@ -20,14 +20,25 @@ function generateRoomCode(): string {
   return code
 }
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
 
+    // Handle CORS preflight
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { headers: corsHeaders })
+    }
+
     // POST /api/rooms — create a new room
     if (request.method === 'POST' && url.pathname === '/api/rooms') {
       const code = generateRoomCode()
-      return Response.json({ code }, { status: 201 })
+      return Response.json({ code }, { status: 201, headers: corsHeaders })
     }
 
     // GET /api/rooms/:code/ws — WebSocket upgrade to GameRoom DO
