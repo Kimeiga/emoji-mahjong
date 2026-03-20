@@ -60,7 +60,7 @@ export function PonButton() {
           animate={{ y: 0, opacity: 1, scale: 1 }}
           exit={{ y: 200, opacity: 0, scale: 0.8 }}
           transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-          className="fixed bottom-0 left-0 right-0 z-50 flex flex-col items-center pb-6 px-4"
+          className="fixed bottom-0 left-0 right-0 z-[200] flex flex-col items-center pb-6 px-4"
         >
           {/* Backdrop overlay */}
           <motion.div
