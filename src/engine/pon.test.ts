@@ -150,9 +150,9 @@ console.log('\n4. callPon — successful claim')
   assert(snap.revealedSets[0].playerId === 1, 'revealed set belongs to P1')
   assert(snap.revealedSets[0].tiles.length === 3, 'revealed set has 3 tiles')
 
-  // P1 should now have 12 tiles (11 + claimed) — needs to discard
+  // P1 should now have 9 tiles in hand (11 - 2 matching that went to meld)
   const p1 = runner.getState().players[1]
-  assert(p1.hand.length === 12, 'P1 has 12 tiles after claiming')
+  assert(p1.hand.length === 9, 'P1 has 9 tiles in hand after pon (2 moved to meld)')
 
   // The discarded tile should have been removed from P0's discards
   const p0 = runner.getState().players[0]

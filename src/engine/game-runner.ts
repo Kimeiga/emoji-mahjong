@@ -310,8 +310,10 @@ export class GameRunner {
       }
     }
 
-    // Win check at WIN_SIZE (12) tiles
-    if (hand.length === WIN_SIZE && isWinningHand(hand)) {
+    // Win check: hand + revealed sets = WIN_SIZE (12) tiles
+    const myMelds = this.state.revealedSets.filter(rs => rs.playerId === pid)
+    const allTiles = [...hand, ...myMelds.flatMap(rs => rs.tiles)]
+    if (allTiles.length === WIN_SIZE && isWinningHand(allTiles)) {
       this.state.phase = 'win'
       this.state.winner = pid
       this.emit('win', { player: pid })
@@ -425,33 +427,38 @@ export class GameRunner {
     // Remove the tile from the discarder's discard pile (last tile)
     const claimedTile = this.state.players[discarderId].discards.pop()!
 
-    // Add the claimed tile to the caller's hand
-    player.hand.push(claimedTile)
-
     // Record the revealed set (the 2 matching tiles + the claimed tile)
-    // Tiles remain in hand for count purposes but are tracked as locked
     this.state.revealedSets.push({
       playerId: callerId,
       tiles: [pon.matchingTiles[0], pon.matchingTiles[1], claimedTile],
       tag: pon.matchingTag,
     })
 
+    // Remove the 2 matching tiles from the player's hand (claimed tile goes to meld, not hand)
+    const removeIds = new Set([pon.matchingTiles[0].id, pon.matchingTiles[1].id])
+    player.hand = player.hand.filter(t => !removeIds.has(t.id))
     player.hand = sortByTag(player.hand)
 
-    // The caller now has 12 tiles — check for win
-    if (player.hand.length === WIN_SIZE && isWinningHand(player.hand)) {
-      this.state.phase = 'win'
-      this.state.winner = callerId
-      this.state.ponAvailable = null
-      this.state.ponDiscarderId = null
-      this.state.currentPlayer = callerId
-      this.emit('pon-called', { playerId: callerId, tile: claimedTile, tag: pon.matchingTag })
-      this.emit('win', { player: callerId })
-      this.emit('state-changed', this.snapshot())
-      return this.snapshot()
+    // Total tiles = hand + revealed set tiles. Check for win.
+    const myMelds = this.state.revealedSets.filter(rs => rs.playerId === callerId)
+    const meldTileCount = myMelds.reduce((sum, rs) => sum + rs.tiles.length, 0)
+    const totalTiles = player.hand.length + meldTileCount
+    if (totalTiles >= WIN_SIZE) {
+      const allTiles = [...player.hand, ...myMelds.flatMap(rs => rs.tiles)]
+      if (isWinningHand(allTiles)) {
+        this.state.phase = 'win'
+        this.state.winner = callerId
+        this.state.ponAvailable = null
+        this.state.ponDiscarderId = null
+        this.state.currentPlayer = callerId
+        this.emit('pon-called', { playerId: callerId, tile: claimedTile, tag: pon.matchingTag })
+        this.emit('win', { player: callerId })
+        this.emit('state-changed', this.snapshot())
+        return this.snapshot()
+      }
     }
 
-    // Caller must now discard (they have 12 tiles)
+    // Caller must now discard from their remaining hand
     this.state.currentPlayer = callerId
     this.state.phase = 'discard'
     this.state.ponAvailable = null
@@ -531,7 +538,9 @@ export class GameRunner {
       const player = this.state.players[pid]
       const hand = player.hand
 
-      if (hand.length === WIN_SIZE && isWinningHand(hand)) {
+      const aiMelds = this.state.revealedSets.filter(rs => rs.playerId === pid)
+      const aiAllTiles = [...hand, ...aiMelds.flatMap(rs => rs.tiles)]
+      if (aiAllTiles.length === WIN_SIZE && isWinningHand(aiAllTiles)) {
         return this.discard(hand[0].id) // triggers win check
       }
 
