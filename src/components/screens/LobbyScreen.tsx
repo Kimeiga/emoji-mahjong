@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useAppStore } from '../../store/app-store'
 import { useMultiplayerStore } from '../../store/multiplayer-store'
@@ -14,25 +13,13 @@ const difficulties: { value: AIDifficulty; label: string }[] = [
 
 export function LobbyScreen() {
   const ws = useAppStore((s) => s.ws)
-  const roomCode = useAppStore((s) => s.roomCode)
   const myPlayerId = useAppStore((s) => s.myPlayerId)
   const disconnect = useAppStore((s) => s.disconnect)
 
   const lobbyPlayers = useMultiplayerStore((s) => s.lobbyPlayers)
   const aiDifficulty = useMultiplayerStore((s) => s.aiDifficulty)
 
-  const [copied, setCopied] = useState(false)
-
   const isHost = myPlayerId === 0
-
-  function handleCopyCode() {
-    if (roomCode) {
-      navigator.clipboard.writeText(roomCode).then(() => {
-        setCopied(true)
-        setTimeout(() => setCopied(false), 2000)
-      })
-    }
-  }
 
   function handleChangeDifficulty(d: AIDifficulty) {
     if (ws) {
@@ -68,25 +55,6 @@ export function LobbyScreen() {
         <div className="text-center mb-6">
           <div className="text-4xl mb-2">🀄</div>
           <h2 className="text-xl font-bold text-white">Game Lobby</h2>
-        </div>
-
-        {/* Room code */}
-        <div className="text-center mb-6">
-          <div className="text-xs text-slate-500 mb-1">Room Code</div>
-          <button
-            onClick={handleCopyCode}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-800 border border-slate-600 hover:border-amber-500 transition-colors group"
-          >
-            <span className="font-mono text-2xl font-bold text-amber-400 tracking-[0.3em]">
-              {roomCode}
-            </span>
-            <span className="text-slate-500 group-hover:text-amber-400 transition-colors text-sm">
-              {copied ? '(copied)' : '(copy)'}
-            </span>
-          </button>
-          <p className="text-xs text-slate-500 mt-2">
-            Share this code with friends to join
-          </p>
         </div>
 
         {/* Player slots */}
