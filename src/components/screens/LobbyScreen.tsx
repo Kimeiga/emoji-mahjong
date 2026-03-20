@@ -109,8 +109,8 @@ export function LobbyScreen() {
               `}
             >
               <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-lg">
-                {player?.connected
-                  ? player.isHuman ? '👤' : '🤖'
+                {player?.connected && player.isHuman
+                  ? '👤'
                   : player && !player.isHuman
                     ? '🤖'
                     : '?'
@@ -120,7 +120,9 @@ export function LobbyScreen() {
                 <div className={`text-sm font-medium ${player?.connected ? 'text-white' : 'text-slate-500'}`}>
                   {player
                     ? player.isHuman
-                      ? player.name + (i === myPlayerId ? ' (you)' : '')
+                      ? player.connected
+                        ? player.name + (i === myPlayerId ? ' (you)' : '')
+                        : 'Waiting...'
                       : 'AI'
                     : 'Waiting...'
                   }
