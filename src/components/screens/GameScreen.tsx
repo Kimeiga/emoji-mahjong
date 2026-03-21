@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGame } from '../../contexts/GameContext'
+import { useMultiplayerStore } from '../../store/multiplayer-store'
 import { DiscardPool } from '../board/DiscardPool'
 import { DrawIndicator } from '../board/DrawIndicator'
 import { PlayerHand } from '../hand/PlayerHand'
@@ -158,8 +159,18 @@ function RiichiToast() {
   )
 }
 
+function ReconnectBanner() {
+  const reconnecting = useMultiplayerStore((s) => s.reconnecting)
+  if (!reconnecting) return null
+  return (
+    <div className="fixed top-0 left-0 right-0 z-[300] bg-amber-500 text-slate-900 text-center text-xs font-bold py-1 animate-pulse">
+      Reconnecting...
+    </div>
+  )
+}
+
 export function GameScreen() {
-  const { myPlayerId } = useGame()
+  const { myPlayerId, mode } = useGame()
 
   const north = ((myPlayerId + 2) % 4) as PlayerId
   const east = ((myPlayerId + 1) % 4) as PlayerId
@@ -167,6 +178,7 @@ export function GameScreen() {
 
   return (
     <div className="h-full flex flex-col max-w-md mx-auto w-full">
+      {mode === 'multiplayer' && <ReconnectBanner />}
       <PonToast />
       <RiichiToast />
 

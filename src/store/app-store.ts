@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { AIDifficulty } from '../multiplayer/protocol'
 import { clearSession } from '../utils/session'
+import { cleanup as cleanupConnection } from '../multiplayer/connection'
 
 export type Screen = 'menu' | 'single-player' | 'lobby' | 'multiplayer-game' | 'result'
 
@@ -18,7 +19,7 @@ interface AppStore {
   disconnect: () => void
 }
 
-export const useAppStore = create<AppStore>((set, get) => ({
+export const useAppStore = create<AppStore>((set) => ({
   screen: 'menu',
   roomCode: null,
   ws: null,
@@ -30,8 +31,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   setMyPlayerId: (id) => set({ myPlayerId: id }),
   setAiDifficulty: (d) => set({ aiDifficulty: d }),
   disconnect: () => {
-    const { ws } = get()
-    if (ws) ws.close()
+    cleanupConnection()
     clearSession()
     set({ ws: null, roomCode: null, screen: 'menu' })
   },

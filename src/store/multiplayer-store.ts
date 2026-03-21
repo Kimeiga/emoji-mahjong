@@ -31,6 +31,10 @@ interface MultiplayerState {
   lastPonEvent: { playerName: string; emoji: string; tag: string } | null
   lastRiichiEvent: { playerName: string } | null
 
+  // Connection
+  reconnecting: boolean
+  setReconnecting: (v: boolean) => void
+
   // Actions
   applyServerMessage: (msg: ServerMessage) => void
   selectTile: (tileId: string | null) => void
@@ -117,6 +121,8 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
   aiDifficulty: 'medium',
 
   rematchVotes: null,
+  reconnecting: false,
+  setReconnecting: (v) => set({ reconnecting: v }),
 
   lastPonEvent: null,
   lastRiichiEvent: null,

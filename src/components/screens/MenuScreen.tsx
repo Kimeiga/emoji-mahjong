@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '../../store/app-store'
 import { useMultiplayerStore } from '../../store/multiplayer-store'
-import { connectToRoom, sendMessage, parseServerMessage, getApiUrl } from '../../multiplayer/client'
+import { getApiUrl } from '../../multiplayer/client'
+import { setupConnection } from '../../multiplayer/connection'
 import { getSession, saveSession, clearSession } from '../../utils/session'
 import { getStats } from '../../utils/stats'
 import type { AIDifficulty, RoomListEntry } from '../../multiplayer/protocol'
@@ -31,7 +32,7 @@ function randomName(): string {
 function ServerBrowser({ playerName, onBack }: { playerName: string; onBack: () => void }) {
   const setScreen = useAppStore((s) => s.setScreen)
   const setRoomCode = useAppStore((s) => s.setRoomCode)
-  const setWs = useAppStore((s) => s.setWs)
+
   const setMyPlayerId = useAppStore((s) => s.setMyPlayerId)
   const applyServerMessage = useMultiplayerStore((s) => s.applyServerMessage)
 
@@ -63,32 +64,27 @@ function ServerBrowser({ playerName, onBack }: { playerName: string; onBack: () 
   function joinRoom(code: string) {
     setJoining(code)
     setError(null)
-    const ws = connectToRoom(code)
+    const name = playerName.trim() || randomName()
 
-    ws.onopen = () => {
-      sendMessage(ws, { type: 'join', playerName: playerName.trim() || randomName() })
-      setWs(ws)
-      setRoomCode(code)
-      setScreen('lobby')
-    }
+    setRoomCode(code)
 
-    ws.onmessage = (event) => {
-      const msg = parseServerMessage(event.data)
-      if (!msg) return
+    setupConnection(code, name, (msg) => {
       if (msg.type === 'assigned') {
         setMyPlayerId(msg.playerId)
-        saveSession({ roomCode: code, playerName: playerName.trim() || 'Player', myPlayerId: msg.playerId })
+        saveSession({ roomCode: code, playerName: name, myPlayerId: msg.playerId })
+      }
+      if (msg.type === 'error') {
+        setJoining(null)
+        setError(msg.message)
+        return
       }
       applyServerMessage(msg)
+      if (msg.type === 'room-state' && !msg.gameStarted) {
+        setScreen('lobby')
+        setJoining(null)
+      }
       if (msg.type === 'game-state') setScreen('multiplayer-game')
-    }
-
-    ws.onerror = () => {
-      setJoining(null)
-      setError('Could not connect to room')
-    }
-
-    ws.onclose = () => setWs(null)
+    })
   }
 
   async function createRoom() {
@@ -235,7 +231,7 @@ function FloatingBackground() {
 
 export function MenuScreen() {
   const setScreen = useAppStore((s) => s.setScreen)
-  const setWs = useAppStore((s) => s.setWs)
+
   const setRoomCode = useAppStore((s) => s.setRoomCode)
   const setMyPlayerId = useAppStore((s) => s.setMyPlayerId)
   const aiDifficulty = useAppStore((s) => s.aiDifficulty)
@@ -258,23 +254,15 @@ export function MenuScreen() {
     }
     if (session) {
       setReconnecting(true)
+      setRoomCode(session.roomCode)
+      setMyPlayerId(session.myPlayerId)
 
-      // Timeout: if reconnection takes more than 5 seconds, give up
       const timeout = setTimeout(() => {
         clearSession()
         setReconnecting(false)
       }, 5000)
 
-      const ws = connectToRoom(session.roomCode)
-      ws.onopen = () => {
-        sendMessage(ws, { type: 'join', playerName: session!.playerName })
-        setWs(ws)
-        setRoomCode(session!.roomCode)
-        setMyPlayerId(session!.myPlayerId)
-      }
-      ws.onmessage = (event) => {
-        const msg = parseServerMessage(event.data)
-        if (!msg) return
+      setupConnection(session.roomCode, session.playerName, (msg) => {
         if (msg.type === 'error') {
           clearTimeout(timeout)
           clearSession()
@@ -293,17 +281,7 @@ export function MenuScreen() {
           setScreen('lobby')
           setReconnecting(false)
         }
-      }
-      ws.onerror = () => {
-        clearTimeout(timeout)
-        clearSession()
-        setReconnecting(false)
-      }
-      ws.onclose = () => {
-        clearTimeout(timeout)
-        setWs(null)
-        setReconnecting(false)
-      }
+      })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
