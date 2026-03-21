@@ -8,21 +8,8 @@ import { scoreSet } from '../../engine/scoring'
 import type { Tile } from '../../types'
 import type { TripletGroup } from '../../engine/triplet-display'
 
-/** Inline discard button that appears below the selected tile */
-function InlineDiscardButton({ onDiscard }: { onDiscard: () => void }) {
-  return (
-    <button
-      onClick={(e) => { e.stopPropagation(); onDiscard() }}
-      className="absolute -bottom-5 left-1/2 -translate-x-1/2 z-[106] text-[9px] font-bold text-red-400 bg-red-500/20 border border-red-500/40 rounded-full px-2 py-0.5 whitespace-nowrap hover:bg-red-500/30 active:bg-red-500/40 transition-colors"
-    >
-      Discard
-    </button>
-  )
-}
-
 function TripletGroupView({
   group, selectedTileId, relatedTileIds, hasSelection, onTap, lastDrawnTileId, tagCounts,
-  isMyTurn, isSelectedLocked, onDiscard,
 }: {
   group: TripletGroup
   selectedTileId: string | null
@@ -31,9 +18,6 @@ function TripletGroupView({
   onTap: (id: string) => void
   lastDrawnTileId: string | null
   tagCounts: Record<string, number>
-  isMyTurn: boolean
-  isSelectedLocked: boolean
-  onDiscard: (id: string) => void
 }) {
   const pts = scoreSet(group.tag, tagCounts)
   return (
@@ -45,20 +29,16 @@ function TripletGroupView({
       <div className="flex gap-0.5 bg-slate-700/30 rounded-xl px-1 py-1 border border-slate-600/50 relative">
         <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center text-[8px] text-white font-bold z-10">✓</div>
         {group.tiles.map((tile) => (
-          <div key={tile.id} className="relative">
-            <TileView
-              tile={tile}
-              size="lg"
-              selected={selectedTileId === tile.id}
-              highlighted={hasSelection && relatedTileIds.has(tile.id)}
-              dimmed={hasSelection && tile.id !== selectedTileId && !relatedTileIds.has(tile.id)}
-              newlyDrawn={tile.id === lastDrawnTileId}
-              onClick={() => onTap(tile.id)}
-            />
-            {isMyTurn && selectedTileId === tile.id && !isSelectedLocked && (
-              <InlineDiscardButton onDiscard={() => onDiscard(tile.id)} />
-            )}
-          </div>
+          <TileView
+            key={tile.id}
+            tile={tile}
+            size="lg"
+            selected={selectedTileId === tile.id}
+            highlighted={hasSelection && relatedTileIds.has(tile.id)}
+            dimmed={hasSelection && tile.id !== selectedTileId && !relatedTileIds.has(tile.id)}
+            newlyDrawn={tile.id === lastDrawnTileId}
+            onClick={() => onTap(tile.id)}
+          />
         ))}
       </div>
     </div>
@@ -249,6 +229,14 @@ export function PlayerHand() {
               >✕</button>
             </div>
 
+            {isMyTurn && !isSelectedLocked && (
+              <button
+                onClick={() => discardTile(selectedTile.id)}
+                className="w-full mt-1 mb-2 py-2 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 font-bold text-sm hover:bg-red-500/30 active:bg-red-500/40 transition-colors"
+              >
+                Discard {selectedTile.emoji}
+              </button>
+            )}
             {isSelectedLocked && (
               <div className="text-[10px] text-amber-400 text-center mb-1">🔒 Locked in a set</div>
             )}
@@ -301,9 +289,6 @@ export function PlayerHand() {
             onTap={handleTap}
             lastDrawnTileId={lastDrawnTileId}
             tagCounts={tagCounts}
-            isMyTurn={isMyTurn}
-            isSelectedLocked={isSelectedLocked}
-            onDiscard={discardTile}
           />
         ))}
 
@@ -335,9 +320,6 @@ export function PlayerHand() {
                     newlyDrawn={tile.id === lastDrawnTileId}
                     onClick={() => handleTap(tile.id)}
                   />
-                  {isMyTurn && selectedTileId === tile.id && !isSelectedLocked && (
-                    <InlineDiscardButton onDiscard={() => discardTile(tile.id)} />
-                  )}
                 </Reorder.Item>
               ))}
             </Reorder.Group>

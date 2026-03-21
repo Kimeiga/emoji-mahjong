@@ -6,11 +6,12 @@ import { scoreSet } from '../../engine/scoring'
 import type { Tile } from '../../types'
 
 function MarketInspector({
-  tile, hand, tagCounts, onClose,
+  tile, hand, tagCounts, onPick, onClose,
 }: {
   tile: Tile
   hand: Tile[]
   tagCounts: Record<string, number>
+  onPick: () => void
   onClose: () => void
 }) {
   // Find which tags this tile shares with tiles in the player's hand
@@ -41,6 +42,12 @@ function MarketInspector({
           >✕</button>
         </div>
 
+        <button
+          onClick={onPick}
+          className="w-full mt-1 mb-2 py-2 rounded-lg bg-sky-500/20 border border-sky-500/40 text-sky-400 font-bold text-sm hover:bg-sky-500/30 active:bg-sky-500/40 transition-colors"
+        >
+          Pick {tile.emoji}
+        </button>
 
         {/* Tag relations with player's hand */}
         <div className="space-y-1 max-h-32 overflow-y-auto">
@@ -97,6 +104,7 @@ export function MarketRow() {
           tile={inspectedTile}
           hand={hand}
           tagCounts={tagCounts}
+          onPick={() => { setInspecting(null); pickMarket(inspectedTile.id) }}
           onClose={() => setInspecting(null)}
         />
       )}
@@ -119,14 +127,6 @@ export function MarketRow() {
                 selected={inspecting === tile.id}
                 onClick={isMyDraw ? () => setInspecting(inspecting === tile.id ? null : tile.id) : undefined}
               />
-              {isMyDraw && inspecting === tile.id && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); setInspecting(null); pickMarket(tile.id) }}
-                  className="absolute -bottom-5 left-1/2 -translate-x-1/2 z-[106] text-[9px] font-bold text-sky-400 bg-sky-500/20 border border-sky-500/40 rounded-full px-2 py-0.5 whitespace-nowrap hover:bg-sky-500/30 active:bg-sky-500/40 transition-colors"
-                >
-                  Pick
-                </button>
-              )}
             </motion.div>
           ))}
           {isMyDraw && (
