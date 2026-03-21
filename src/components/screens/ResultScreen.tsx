@@ -8,7 +8,6 @@ import { sendMessage } from '../../multiplayer/client'
 import { TagPill } from '../shared/Tile'
 import { findDisplayTriplets } from '../../engine/triplet-display'
 import { getStats, recordResult } from '../../utils/stats'
-import { scoreSets } from '../../engine/scoring'
 
 export function ResultScreen() {
   const { phase, winner, players, myPlayerId, mode, turnCount, gameStartTime, tagCounts } = useGame()
@@ -24,8 +23,8 @@ export function ResultScreen() {
 
   const triplets = useMemo(() => {
     if (!winnerPlayer) return []
-    return findDisplayTriplets(winnerPlayer.hand)
-  }, [winnerPlayer])
+    return findDisplayTriplets(winnerPlayer.hand, 4, tagCounts)
+  }, [winnerPlayer, tagCounts])
 
   const elapsedSecs = Math.floor((Date.now() - gameStartTime) / 1000)
   const mins = Math.floor(elapsedSecs / 60)
@@ -81,7 +80,7 @@ export function ResultScreen() {
 
         {/* Winner's sets with scores */}
         {!isDraw && winnerPlayer && triplets.length > 0 && (() => {
-          const { setScores, total } = scoreSets(triplets, tagCounts)
+          const total = triplets.reduce((sum, g) => sum + g.score, 0)
           return (
             <>
               <div className="mt-3 text-2xl font-black text-amber-400">
@@ -98,7 +97,7 @@ export function ResultScreen() {
                   >
                     <div className="mb-1 flex items-center gap-1">
                       <TagPill tag={group.tag} />
-                      <span className="text-[10px] text-amber-400 font-bold">{setScores[gi].score}pt</span>
+                      <span className="text-[10px] text-amber-400 font-bold">{group.score}pt</span>
                     </div>
                     <div className="flex gap-0.5 bg-slate-700/40 rounded-xl px-1.5 py-1.5 border border-slate-600/50">
                       {group.tiles.map((tile) => (

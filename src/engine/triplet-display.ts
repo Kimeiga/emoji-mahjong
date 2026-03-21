@@ -1,16 +1,23 @@
 import type { Tile } from '../types'
+import { POOL_SIZE } from '../data/emojis'
 
 export interface TripletGroup {
   tag: string
   tiles: Tile[]
+  score: number
 }
 
 /**
- * Find the maximum non-overlapping triplets using backtracking.
+ * Find the highest-scoring decomposition of 4 non-overlapping triplets.
  * Each triplet is 3 tiles sharing at least one common tag.
- * Returns the tag label + tiles for display.
+ * For each triplet, picks the rarest shared tag (highest score).
+ * Uses backtracking to find the decomposition with maximum total score.
  */
-export function findDisplayTriplets(hand: Tile[], maxTriplets = 4): TripletGroup[] {
+export function findDisplayTriplets(
+  hand: Tile[],
+  maxTriplets = 4,
+  tagCounts?: Record<string, number>
+): TripletGroup[] {
   // Build tag → tiles map
   const tagGroups = new Map<string, Tile[]>()
   for (const tile of hand) {
@@ -23,31 +30,52 @@ export function findDisplayTriplets(hand: Tile[], maxTriplets = 4): TripletGroup
   // Get candidate tag groups (3+ tiles sharing a tag)
   const candidates = [...tagGroups.entries()]
     .filter(([, tiles]) => tiles.length >= 3)
-    .sort((a, b) => a[1].length - b[1].length) // try smaller groups first (more constrained)
+    .sort((a, b) => {
+      // Sort by score descending (rarest first) to find high-value sets early
+      const scoreA = tagCounts ? Math.round(POOL_SIZE / (tagCounts[a[0]] || POOL_SIZE)) : 0
+      const scoreB = tagCounts ? Math.round(POOL_SIZE / (tagCounts[b[0]] || POOL_SIZE)) : 0
+      return scoreB - scoreA
+    })
 
-  // Backtracking search for maximum triplets
   let bestResult: TripletGroup[] = []
+  let bestScore = -1
+
+  function getTagScore(tag: string): number {
+    if (!tagCounts) return 1
+    return Math.round(POOL_SIZE / (tagCounts[tag] || POOL_SIZE))
+  }
+
+  function totalScore(groups: TripletGroup[]): number {
+    return groups.reduce((sum, g) => sum + g.score, 0)
+  }
 
   function search(usedIds: Set<string>, found: TripletGroup[], startIdx: number) {
-    if (found.length > bestResult.length) {
+    if (found.length >= maxTriplets) {
+      const score = totalScore(found)
+      if (score > bestScore) {
+        bestScore = score
+        bestResult = [...found]
+      }
+      return
+    }
+
+    // Prune: even if remaining groups are max score, can we beat best?
+    if (found.length > bestResult.length || (found.length === bestResult.length && totalScore(found) > bestScore)) {
+      bestScore = totalScore(found)
       bestResult = [...found]
     }
-    if (found.length >= maxTriplets) return // found max
-    if (bestResult.length >= maxTriplets) return // already have max
 
     for (let ci = startIdx; ci < candidates.length; ci++) {
       const [tag, tiles] = candidates[ci]
       const available = tiles.filter(t => !usedIds.has(t.id))
       if (available.length < 3) continue
 
-      // Try picking 3 from available (just use first 3 for speed)
+      const score = getTagScore(tag)
       const chosen = available.slice(0, 3)
       const newUsed = new Set(usedIds)
       for (const t of chosen) newUsed.add(t.id)
 
-      search(newUsed, [...found, { tag, tiles: chosen }], ci + 1)
-
-      if (bestResult.length >= maxTriplets) return // prune
+      search(newUsed, [...found, { tag, tiles: chosen, score }], ci + 1)
     }
   }
 
