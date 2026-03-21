@@ -451,8 +451,14 @@ export class GameRunner {
       const lockedIds = this.getLockedTileIds(pid)
       const availableHand = this.state.players[pid].hand.filter(t => !lockedIds.has(t.id))
 
+      // Tags already used in this player's melds (unique tag rule)
+      const usedTags = new Set(
+        this.state.revealedSets.filter(rs => rs.playerId === pid).map(rs => rs.tag)
+      )
+
       // For each tag on the discarded tile, check if this player has 2+ tiles with that tag
       for (const tag of discardedTile.tags) {
+        if (usedTags.has(tag)) continue // can't reuse a tag
         const matching = availableHand.filter(t => t.tags.includes(tag))
         if (matching.length >= 2) {
           results.push({ playerId: pid, tag })
