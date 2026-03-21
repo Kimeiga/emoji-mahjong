@@ -1,9 +1,41 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
+import {
+  DndContext, closestCenter, PointerSensor, TouchSensor,
+  useSensor, useSensors, type DragEndEvent,
+} from '@dnd-kit/core'
+import { SortableContext, rectSortingStrategy, useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { useGame } from '../../contexts/GameContext'
 import { TileView, TagPill } from '../shared/Tile'
 import { canDeclareRiichi } from '../../engine/sets'
 import { scoreSet } from '../../engine/scoring'
 import type { Tile } from '../../types'
+
+function SortableTile({ tile, selected, highlighted, dimmed, newlyDrawn, onClick }: {
+  tile: Tile; selected: boolean; highlighted: boolean; dimmed: boolean; newlyDrawn: boolean; onClick: () => void
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tile.id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+    opacity: isDragging ? 0.8 : undefined,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <TileView
+        tile={tile}
+        size="lg"
+        selected={selected}
+        highlighted={highlighted}
+        dimmed={dimmed}
+        newlyDrawn={newlyDrawn}
+        onClick={onClick}
+      />
+    </div>
+  )
+}
 
 function LockedSetView({ tag, tiles, tagCounts, onTap }: { tag: string; tiles: Tile[]; tagCounts: Record<string, number>; onTap: (id: string) => void }) {
   const pts = scoreSet(tag, tagCounts)
@@ -77,6 +109,37 @@ export function PlayerHand() {
     hand.filter(t => !lockedTileIds.has(t.id)),
     [hand, lockedTileIds]
   )
+
+  // Ordered tiles for drag-to-reorder (synced with hand changes)
+  const [orderedTiles, setOrderedTiles] = useState(unlockedHand)
+  useEffect(() => {
+    const currentIds = new Set(unlockedHand.map(t => t.id))
+    const kept = orderedTiles.filter(t => currentIds.has(t.id))
+    const added = unlockedHand.filter(t => !kept.find(o => o.id === t.id))
+    if (added.length > 0 || kept.length !== orderedTiles.length) {
+      setOrderedTiles([...kept, ...added])
+    }
+  }, [unlockedHand])
+
+  // dnd-kit sensors: require 8px movement to start drag (distinguishes from tap)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+  )
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setOrderedTiles(prev => {
+      const oldIdx = prev.findIndex(t => t.id === active.id)
+      const newIdx = prev.findIndex(t => t.id === over.id)
+      if (oldIdx === -1 || newIdx === -1) return prev
+      const next = [...prev]
+      const [moved] = next.splice(oldIdx, 1)
+      next.splice(newIdx, 0, moved)
+      return next
+    })
+  }
 
   const tagRelations = useMemo(() => {
     if (!selectedTile) return []
@@ -206,22 +269,25 @@ export function PlayerHand() {
           <LockedSetView key={rs.tag} tag={rs.tag} tiles={rs.tiles} tagCounts={tagCounts} onTap={handleTap} />
         ))}
 
-        {/* All unlocked tiles */}
-        {unlockedHand.length > 0 && (
-          <div className="flex gap-1 justify-center flex-wrap w-full">
-            {unlockedHand.map((tile) => (
-              <TileView
-                key={tile.id}
-                tile={tile}
-                size="lg"
-                selected={selectedTileId === tile.id}
-                highlighted={hasSelection && relatedTileIds.has(tile.id)}
-                dimmed={hasSelection && tile.id !== selectedTileId && !relatedTileIds.has(tile.id)}
-                newlyDrawn={tile.id === lastDrawnTileId}
-                onClick={() => handleTap(tile.id)}
-              />
-            ))}
-          </div>
+        {/* All unlocked tiles — sortable grid */}
+        {orderedTiles.length > 0 && (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={orderedTiles.map(t => t.id)} strategy={rectSortingStrategy}>
+              <div className="flex gap-1 justify-center flex-wrap w-full">
+                {orderedTiles.map((tile) => (
+                  <SortableTile
+                    key={tile.id}
+                    tile={tile}
+                    selected={selectedTileId === tile.id}
+                    highlighted={hasSelection && relatedTileIds.has(tile.id)}
+                    dimmed={hasSelection && tile.id !== selectedTileId && !relatedTileIds.has(tile.id)}
+                    newlyDrawn={tile.id === lastDrawnTileId}
+                    onClick={() => handleTap(tile.id)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
       </div>
 
