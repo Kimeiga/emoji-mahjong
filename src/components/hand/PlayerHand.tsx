@@ -234,11 +234,20 @@ export function PlayerHand() {
             axis="x"
             values={orderedUngrouped}
             onReorder={setOrderedUngrouped}
-            className="flex gap-1 justify-center flex-wrap w-full"
+            className="flex gap-0.5 justify-center flex-wrap w-full"
             style={{ listStyle: 'none' }}
           >
-            {orderedUngrouped.map((tile) => {
+            {orderedUngrouped.map((tile, idx) => {
+              // Check if this tile is part of a triplet
               const tripletGroup = triplets.find(g => g.tiles.some(t => t.id === tile.id))
+              // Check if consecutive tiles form a visual run of the same triplet
+              const prevTile = idx > 0 ? orderedUngrouped[idx - 1] : null
+              const nextTile = idx < orderedUngrouped.length - 1 ? orderedUngrouped[idx + 1] : null
+              const prevInSameGroup = prevTile && tripletGroup && tripletGroup.tiles.some(t => t.id === prevTile.id)
+              const nextInSameGroup = nextTile && tripletGroup && tripletGroup.tiles.some(t => t.id === nextTile.id)
+              const isFirstInRun = tripletGroup && !prevInSameGroup
+              const isLastInRun = tripletGroup && !nextInSameGroup
+
               return (
                 <Reorder.Item
                   key={tile.id}
@@ -247,21 +256,32 @@ export function PlayerHand() {
                   whileDrag={{ scale: 1.1, zIndex: 50 }}
                 >
                   <div className="flex flex-col items-center">
-                    {tripletGroup && (
+                    {/* Show tag pill only on first tile of a consecutive run */}
+                    {isFirstInRun && tripletGroup && (
                       <div className="mb-0.5 flex items-center gap-0.5">
                         <TagPill tag={tripletGroup.tag} />
-                        <span className="text-[8px] text-green-400">✓</span>
+                        <span className="text-[8px] text-amber-400 font-bold">{scoreSet(tripletGroup.tag, tagCounts)}pt</span>
                       </div>
                     )}
-                    <TileView
-                      tile={tile}
-                      size="lg"
-                      selected={selectedTileId === tile.id}
-                      highlighted={hasSelection && relatedTileIds.has(tile.id)}
-                      dimmed={hasSelection && tile.id !== selectedTileId && !relatedTileIds.has(tile.id)}
-                      newlyDrawn={tile.id === lastDrawnTileId}
-                      onClick={() => handleTap(tile.id)}
-                    />
+                    {/* Spacer for non-first-in-run triplet tiles to align */}
+                    {tripletGroup && !isFirstInRun && (
+                      <div className="mb-0.5 h-[18px]" />
+                    )}
+                    <div className={
+                      tripletGroup
+                        ? `${isFirstInRun ? 'rounded-l-xl pl-1' : ''} ${isLastInRun ? 'rounded-r-xl pr-1' : ''} bg-slate-700/30 border-t border-b border-slate-600/50 ${isFirstInRun ? 'border-l' : ''} ${isLastInRun ? 'border-r' : ''} py-1`
+                        : ''
+                    }>
+                      <TileView
+                        tile={tile}
+                        size="lg"
+                        selected={selectedTileId === tile.id}
+                        highlighted={hasSelection && relatedTileIds.has(tile.id)}
+                        dimmed={hasSelection && tile.id !== selectedTileId && !relatedTileIds.has(tile.id)}
+                        newlyDrawn={tile.id === lastDrawnTileId}
+                        onClick={() => handleTap(tile.id)}
+                      />
+                    </div>
                   </div>
                 </Reorder.Item>
               )
