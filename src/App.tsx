@@ -132,11 +132,59 @@ function App() {
     }
   })()
 
+  function copyDebug() {
+    try {
+      const gs = (window as any).__gameState?.()
+      const appState = useAppStore.getState()
+      const debug = {
+        version: 'v57',
+        time: new Date().toISOString(),
+        screen: appState.screen,
+        myPlayerId: appState.myPlayerId,
+        wsOpen: appState.ws?.readyState === WebSocket.OPEN,
+        game: gs ? {
+          phase: gs.phase,
+          currentPlayer: gs.currentPlayer,
+          myPlayerId: gs.myPlayerId,
+          turnCount: gs.turnCount,
+          wallCount: gs.wallCount,
+          marketLen: gs.market?.length,
+          winner: gs.winner,
+          players: gs.players?.map((p: any) => ({
+            id: p.id, name: p.name, isHuman: p.isHuman, riichi: p.riichi,
+            handSize: p.hand?.length, discardCount: p.discards?.length,
+          })),
+          revealedSets: gs.revealedSets?.map((rs: any) => ({
+            playerId: rs.playerId, tag: rs.tag,
+            tiles: rs.tiles?.map((t: any) => t.emoji).join(''),
+          })),
+          ponAvailable: gs.ponAvailable ? {
+            playerId: gs.ponAvailable.playerId,
+            tag: gs.ponAvailable.matchingTag,
+            tile: gs.ponAvailable.tile?.emoji,
+          } : null,
+        } : 'no game state',
+      }
+      const text = JSON.stringify(debug, null, 2)
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Debug info copied to clipboard!')
+      })
+    } catch (e) {
+      alert('Error: ' + e)
+    }
+  }
+
   return (
     <>
       {content}
+      <button
+        onClick={copyDebug}
+        className="fixed bottom-1 left-2 text-[9px] text-slate-600/50 z-[300] hover:text-slate-400 transition-colors"
+      >
+        debug
+      </button>
       <div className="fixed bottom-1 right-2 text-[9px] text-slate-600/40 pointer-events-none z-0">
-        v56
+        v57
       </div>
     </>
   )
