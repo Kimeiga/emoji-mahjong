@@ -64,15 +64,17 @@ function MarketInspector({
               </div>
               {relatedTiles.length >= 2 ? (
                 <span className="text-[9px] text-green-400 font-bold bg-green-500/10 px-1.5 py-0.5 rounded-full">✓ SET! ({scoreSet(tag, tagCounts)}pt)</span>
+              ) : (tagCounts[tag] || 0) < 3 ? (
+                <span className="text-[9px] text-slate-600">not enough in pool</span>
               ) : (
                 <span className="text-[9px] text-slate-500">need {2 - relatedTiles.length} more → {scoreSet(tag, tagCounts)}pt</span>
               )}
             </div>
           ))}
-          {tile.tags.filter(t => !tagRelations.find(r => r.tag === t)).length > 0 && (
+          {tile.tags.filter(t => !tagRelations.find(r => r.tag === t) && (tagCounts[t] || 0) >= 3).length > 0 && (
             <div className="flex flex-wrap gap-1 pt-1 border-t border-slate-700">
               {tile.tags
-                .filter(t => !tagRelations.find(r => r.tag === t))
+                .filter(t => !tagRelations.find(r => r.tag === t) && (tagCounts[t] || 0) >= 3)
                 .slice(0, 6)
                 .map(tag => (<TagPill key={tag} tag={tag} count={tagCounts[tag] || 0} />))}
             </div>
