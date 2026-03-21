@@ -6,44 +6,6 @@ import { findDisplayTriplets } from '../../engine/triplet-display'
 import { canDeclareRiichi } from '../../engine/sets'
 import { scoreSet } from '../../engine/scoring'
 import type { Tile } from '../../types'
-import type { TripletGroup } from '../../engine/triplet-display'
-
-function TripletGroupView({
-  group, selectedTileId, relatedTileIds, hasSelection, onTap, lastDrawnTileId, tagCounts,
-}: {
-  group: TripletGroup
-  selectedTileId: string | null
-  relatedTileIds: Set<string>
-  hasSelection: boolean
-  onTap: (id: string) => void
-  lastDrawnTileId: string | null
-  tagCounts: Record<string, number>
-}) {
-  const pts = scoreSet(group.tag, tagCounts)
-  return (
-    <div className="flex flex-col items-center">
-      <div className="mb-0.5 flex items-center gap-1">
-        <TagPill tag={group.tag} />
-        <span className="text-[9px] text-amber-400 font-bold">{pts}pt</span>
-      </div>
-      <div className="flex gap-0.5 bg-slate-700/30 rounded-xl px-1 py-1 border border-slate-600/50 relative">
-        <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center text-[8px] text-white font-bold z-10">✓</div>
-        {group.tiles.map((tile) => (
-          <TileView
-            key={tile.id}
-            tile={tile}
-            size="lg"
-            selected={selectedTileId === tile.id}
-            highlighted={hasSelection && relatedTileIds.has(tile.id)}
-            dimmed={hasSelection && tile.id !== selectedTileId && !relatedTileIds.has(tile.id)}
-            newlyDrawn={tile.id === lastDrawnTileId}
-            onClick={() => onTap(tile.id)}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
 
 function LockedSetView({ tag, tiles, tagCounts, onTap }: { tag: string; tiles: Tile[]; tagCounts: Record<string, number>; onTap: (id: string) => void }) {
   const pts = scoreSet(tag, tagCounts)
@@ -124,14 +86,6 @@ export function PlayerHand() {
   )
 
   const triplets = useMemo(() => findDisplayTriplets(unlockedHand), [unlockedHand])
-  const tripletTileIds = useMemo(() => {
-    const ids = new Set<string>()
-    for (const group of triplets) {
-      for (const tile of group.tiles) ids.add(tile.id)
-    }
-    return ids
-  }, [triplets])
-
   const tagRelations = useMemo(() => {
     if (!selectedTile) return []
     const relations: { tag: string; relatedTiles: Tile[] }[] = []
@@ -151,21 +105,16 @@ export function PlayerHand() {
     return ids
   }, [tagRelations])
 
-  const ungrouped = useMemo(() => {
-    return hand.filter(t => !tripletTileIds.has(t.id) && !lockedTileIds.has(t.id))
-  }, [hand, tripletTileIds, lockedTileIds])
-
-  // Maintain ordered list for drag-to-reorder
-  const [orderedUngrouped, setOrderedUngrouped] = useState(ungrouped)
+  // All unlocked tiles (triplet + ungrouped) in one reorderable list
+  const [orderedUngrouped, setOrderedUngrouped] = useState(unlockedHand)
   useEffect(() => {
-    // Sync when tiles change (draw, discard, pon) but preserve user's custom order
-    const currentIds = new Set(ungrouped.map(t => t.id))
+    const currentIds = new Set(unlockedHand.map(t => t.id))
     const ordered = orderedUngrouped.filter(t => currentIds.has(t.id))
-    const newTiles = ungrouped.filter(t => !ordered.find(o => o.id === t.id))
+    const newTiles = unlockedHand.filter(t => !ordered.find(o => o.id === t.id))
     if (newTiles.length > 0 || ordered.length !== orderedUngrouped.length) {
       setOrderedUngrouped([...ordered, ...newTiles])
     }
-  }, [ungrouped])
+  }, [unlockedHand])
 
   const canRiichi = useMemo(() => {
     if (isRiichi || !isMyTurn) return false
@@ -279,51 +228,45 @@ export function PlayerHand() {
           <LockedSetView key={rs.tag} tag={rs.tag} tiles={rs.tiles} tagCounts={tagCounts} onTap={handleTap} />
         ))}
 
-        {triplets.map((group) => (
-          <TripletGroupView
-            key={group.tag}
-            group={group}
-            selectedTileId={selectedTileId}
-            relatedTileIds={relatedTileIds}
-            hasSelection={hasSelection}
-            onTap={handleTap}
-            lastDrawnTileId={lastDrawnTileId}
-            tagCounts={tagCounts}
-          />
-        ))}
-
-        {orderedUngrouped.length > 0 && (
-          <div className="flex flex-col items-center w-full">
-            {triplets.length > 0 && (
-              <div className="text-[9px] text-slate-500 mb-0.5">loose</div>
-            )}
-            <Reorder.Group
-              axis="x"
-              values={orderedUngrouped}
-              onReorder={setOrderedUngrouped}
-              className="flex gap-1 justify-center flex-wrap w-full"
-              style={{ listStyle: 'none' }}
-            >
-              {orderedUngrouped.map((tile) => (
+        {/* All unlocked tiles in one reorderable list */}
+        {unlockedHand.length > 0 && (
+          <Reorder.Group
+            axis="x"
+            values={orderedUngrouped}
+            onReorder={setOrderedUngrouped}
+            className="flex gap-1 justify-center flex-wrap w-full"
+            style={{ listStyle: 'none' }}
+          >
+            {orderedUngrouped.map((tile) => {
+              const tripletGroup = triplets.find(g => g.tiles.some(t => t.id === tile.id))
+              return (
                 <Reorder.Item
                   key={tile.id}
                   value={tile}
-                  className="touch-none relative"
+                  className="touch-none"
                   whileDrag={{ scale: 1.1, zIndex: 50 }}
                 >
-                  <TileView
-                    tile={tile}
-                    size="lg"
-                    selected={selectedTileId === tile.id}
-                    highlighted={hasSelection && relatedTileIds.has(tile.id)}
-                    dimmed={hasSelection && tile.id !== selectedTileId && !relatedTileIds.has(tile.id)}
-                    newlyDrawn={tile.id === lastDrawnTileId}
-                    onClick={() => handleTap(tile.id)}
-                  />
+                  <div className="flex flex-col items-center">
+                    {tripletGroup && (
+                      <div className="mb-0.5 flex items-center gap-0.5">
+                        <TagPill tag={tripletGroup.tag} />
+                        <span className="text-[8px] text-green-400">✓</span>
+                      </div>
+                    )}
+                    <TileView
+                      tile={tile}
+                      size="lg"
+                      selected={selectedTileId === tile.id}
+                      highlighted={hasSelection && relatedTileIds.has(tile.id)}
+                      dimmed={hasSelection && tile.id !== selectedTileId && !relatedTileIds.has(tile.id)}
+                      newlyDrawn={tile.id === lastDrawnTileId}
+                      onClick={() => handleTap(tile.id)}
+                    />
+                  </div>
                 </Reorder.Item>
-              ))}
-            </Reorder.Group>
-          </div>
+              )
+            })}
+          </Reorder.Group>
         )}
       </div>
 
