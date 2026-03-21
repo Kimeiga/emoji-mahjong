@@ -34,6 +34,7 @@ export class GameRoom implements DurableObject {
   private lobbyPlayers: LobbyPlayer[] = []
   private gameStarted = false
   private rematchVotes: Set<PlayerId> = new Set()
+  private aiTimer: ReturnType<typeof setTimeout> | null = null
   private ctx: DurableObjectState
   private env: Env
 
@@ -503,6 +504,12 @@ export class GameRoom implements DurableObject {
   }
 
   private scheduleAITurns() {
+    // Clear any pending AI timer to prevent overlapping turns
+    if (this.aiTimer) {
+      clearTimeout(this.aiTimer)
+      this.aiTimer = null
+    }
+
     if (!this.runner) return
     const state = this.runner.getState()
 
@@ -513,7 +520,7 @@ export class GameRoom implements DurableObject {
     if (state.phase === 'pon-available' && state.ponAvailable) {
       const ponPlayer = state.ponAvailable.playerId
       if (!this.isHumanPlayer(ponPlayer)) {
-        setTimeout(() => this.handleAIPon(), 600)
+        this.aiTimer = setTimeout(() => { this.aiTimer = null; this.handleAIPon() }, 600)
         return
       }
       // Human pon — wait for their decision
@@ -524,11 +531,10 @@ export class GameRoom implements DurableObject {
     const isHuman = this.isHumanPlayer(state.currentPlayer)
     if (!isHuman) {
       if (state.phase === 'draw') {
-        setTimeout(() => this.handleAIDraw(), 600)
+        this.aiTimer = setTimeout(() => { this.aiTimer = null; this.handleAIDraw() }, 600)
       } else if (state.phase === 'discard') {
-        setTimeout(() => this.handleAIDiscard(), 800)
+        this.aiTimer = setTimeout(() => { this.aiTimer = null; this.handleAIDiscard() }, 800)
       }
-    // Human players in draw phase now choose via pick-market or draw-blind messages
     }
   }
 
@@ -589,8 +595,9 @@ export class GameRoom implements DurableObject {
       // If drawBlind fails (wall empty), try market
       if (state.market.length > 0) {
         try { this.runner.pickMarket(state.market[0].id) } catch { return }
+      } else {
+        return
       }
-      return
     }
 
     this.broadcastGameState()
@@ -598,7 +605,7 @@ export class GameRoom implements DurableObject {
     // After drawing, the AI needs to discard
     const newState = this.runner.getState()
     if (newState.phase === 'discard' && !this.isHumanPlayer(newState.currentPlayer)) {
-      setTimeout(() => this.handleAIDiscard(), 800)
+      this.aiTimer = setTimeout(() => { this.aiTimer = null; this.handleAIDiscard() }, 800)
     }
   }
 
