@@ -50,7 +50,6 @@ export function TileView({ tile, size = 'md', selected, dimmed, highlighted, new
         boxShadow: ['0 0 0px rgba(56,189,248,0)', '0 0 12px rgba(56,189,248,0.5)', '0 0 0px rgba(56,189,248,0)'],
       } : undefined}
       transition={newlyDrawn ? { duration: 1, repeat: 1 } : undefined}
-      layout
     >
       <span className="leading-none">{tile.emoji}</span>
     </motion.button>

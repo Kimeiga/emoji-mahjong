@@ -117,10 +117,8 @@ export function MarketRow() {
         </div>
         <div className="flex gap-1.5 items-center">
           {market.map((tile) => (
-            <motion.div
+            <div
               key={tile.id}
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
               className={`relative ${isMyDraw ? 'cursor-pointer' : 'opacity-60'}`}
             >
               <TileView
@@ -129,7 +127,7 @@ export function MarketRow() {
                 selected={inspecting === tile.id}
                 onClick={isMyDraw ? () => setInspecting(inspecting === tile.id ? null : tile.id) : undefined}
               />
-            </motion.div>
+            </div>
           ))}
           {isMyDraw && (
             <motion.button
