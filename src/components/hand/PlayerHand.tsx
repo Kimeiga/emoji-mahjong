@@ -2,7 +2,6 @@ import { useMemo, useState, useEffect } from 'react'
 import { Reorder } from 'framer-motion'
 import { useGame } from '../../contexts/GameContext'
 import { TileView, TagPill } from '../shared/Tile'
-import { findDisplayTriplets } from '../../engine/triplet-display'
 import { canDeclareRiichi } from '../../engine/sets'
 import { scoreSet } from '../../engine/scoring'
 import type { Tile } from '../../types'
@@ -26,7 +25,7 @@ function LockedSetView({ tag, tiles, tagCounts, onTap }: { tag: string; tiles: T
   )
 }
 
-function ProgressBar({ current, total, score }: { current: number; total: number; score: number }) {
+function ProgressBar({ current, total }: { current: number; total: number }) {
   const pct = (current / total) * 100
   return (
     <div className="flex items-center gap-2 mt-1.5 px-4">
@@ -39,13 +38,8 @@ function ProgressBar({ current, total, score }: { current: number; total: number
         />
       </div>
       <span className={`text-[10px] font-bold ${current >= total ? 'text-green-400' : 'text-slate-400'}`}>
-        {current}/{total}
+        {current}/{total} sets
       </span>
-      {score > 0 && (
-        <span className="text-[10px] text-amber-400 font-bold">
-          {score} pts
-        </span>
-      )}
     </div>
   )
 }
@@ -85,7 +79,6 @@ export function PlayerHand() {
     [hand, lockedTileIds]
   )
 
-  const triplets = useMemo(() => findDisplayTriplets(unlockedHand), [unlockedHand])
   const tagRelations = useMemo(() => {
     if (!selectedTile) return []
     const relations: { tag: string; relatedTiles: Tile[] }[] = []
@@ -105,14 +98,14 @@ export function PlayerHand() {
     return ids
   }, [tagRelations])
 
-  // All unlocked tiles (triplet + ungrouped) in one reorderable list
-  const [orderedUngrouped, setOrderedUngrouped] = useState(unlockedHand)
+  // Reorderable tile list
+  const [orderedTiles, setOrderedTiles] = useState(unlockedHand)
   useEffect(() => {
     const currentIds = new Set(unlockedHand.map(t => t.id))
-    const ordered = orderedUngrouped.filter(t => currentIds.has(t.id))
+    const ordered = orderedTiles.filter(t => currentIds.has(t.id))
     const newTiles = unlockedHand.filter(t => !ordered.find(o => o.id === t.id))
-    if (newTiles.length > 0 || ordered.length !== orderedUngrouped.length) {
-      setOrderedUngrouped([...ordered, ...newTiles])
+    if (newTiles.length > 0 || ordered.length !== orderedTiles.length) {
+      setOrderedTiles([...ordered, ...newTiles])
     }
   }, [unlockedHand])
 
@@ -122,20 +115,18 @@ export function PlayerHand() {
   }, [hand, isMyTurn, isRiichi])
 
   const handleTap = (tileId: string) => {
-    // Always allow inspecting any tile (locked or not, any phase)
     if (selectedTileId === tileId) {
-      selectTile(null) // tap again to close modal
+      selectTile(null)
     } else {
       selectTile(tileId)
     }
   }
 
-  const totalSets = myLockedSets.length + triplets.length
   const hasSelection = !!selectedTile
 
   return (
     <div className="px-2 pb-3 pt-1">
-      {/* Status area — fixed height to prevent layout shift when modal opens */}
+      {/* Status area */}
       <div className="h-7 flex items-center justify-center relative z-[106]">
         {isRiichi && (
           <div className="text-center text-xs text-red-400 font-bold tracking-widest">
@@ -160,143 +151,106 @@ export function PlayerHand() {
         )}
       </div>
 
-      {/* Tag inspector modal — fixed overlay */}
+      {/* Tag inspector modal */}
       {selectedTile && (
-        <>
-          <div className="modal-above-hand fixed left-4 right-4 z-[105] bg-slate-800/95 rounded-xl p-3 mx-auto max-w-sm border border-slate-700 shadow-xl">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">{selectedTile.emoji}</span>
-                <div>
-                  <div className="text-sm text-white font-medium">{selectedTile.name}</div>
-                  <div className="text-[10px] text-slate-400">Tags & related tiles</div>
-                </div>
+        <div className="modal-above-hand fixed left-4 right-4 z-[105] bg-slate-800/95 rounded-xl p-3 mx-auto max-w-sm border border-slate-700 shadow-xl">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">{selectedTile.emoji}</span>
+              <div>
+                <div className="text-sm text-white font-medium">{selectedTile.name}</div>
+                <div className="text-[10px] text-slate-400">Tags & related tiles</div>
               </div>
-              <button
-                onClick={() => selectTile(null)}
-                className="w-6 h-6 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-slate-400 hover:text-white text-xs transition-colors"
-              >✕</button>
             </div>
+            <button
+              onClick={() => selectTile(null)}
+              className="w-6 h-6 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-slate-400 hover:text-white text-xs transition-colors"
+            >✕</button>
+          </div>
 
-            {isMyTurn && !isSelectedLocked && (
-              <button
-                onClick={() => discardTile(selectedTile.id)}
-                className="w-full mt-1 mb-2 py-2 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 font-bold text-sm hover:bg-red-500/30 active:bg-red-500/40 transition-colors"
-              >
-                Discard {selectedTile.emoji}
-              </button>
-            )}
-            {isSelectedLocked && (
-              <div className="text-[10px] text-amber-400 text-center mb-1">🔒 Locked in a set</div>
-            )}
+          {isMyTurn && !isSelectedLocked && (
+            <button
+              onClick={() => discardTile(selectedTile.id)}
+              className="w-full mt-1 mb-2 py-2 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 font-bold text-sm hover:bg-red-500/30 active:bg-red-500/40 transition-colors"
+            >
+              Discard {selectedTile.emoji}
+            </button>
+          )}
+          {isSelectedLocked && (
+            <div className="text-[10px] text-amber-400 text-center mb-1">🔒 Locked in a set</div>
+          )}
 
-            <div className="space-y-1 max-h-32 overflow-y-auto">
-              {tagRelations.slice(0, 8).map(({ tag, relatedTiles }) => (
-                <div key={tag} className="flex items-center gap-1.5 flex-wrap">
-                  <TagPill tag={tag} count={tagCounts[tag] || 0} />
-                  <div className="flex gap-0.5">
-                    {relatedTiles.slice(0, 5).map(t => (
-                      <span key={t.id} className="text-sm">{t.emoji}</span>
-                    ))}
-                    {relatedTiles.length > 5 && (
-                      <span className="text-[10px] text-slate-500">+{relatedTiles.length - 5}</span>
-                    )}
-                  </div>
-                  {relatedTiles.length >= 2 ? (
-                    <span className="text-[9px] text-green-400 font-bold bg-green-500/10 px-1.5 py-0.5 rounded-full">✓ SET! ({scoreSet(tag, tagCounts)}pt)</span>
-                  ) : (
-                    <span className="text-[9px] text-slate-500">need {2 - relatedTiles.length} more → {scoreSet(tag, tagCounts)}pt</span>
+          <div className="space-y-1 max-h-32 overflow-y-auto">
+            {tagRelations.slice(0, 8).map(({ tag, relatedTiles }) => (
+              <div key={tag} className="flex items-center gap-1.5 flex-wrap">
+                <TagPill tag={tag} count={tagCounts[tag] || 0} />
+                <div className="flex gap-0.5">
+                  {relatedTiles.slice(0, 5).map(t => (
+                    <span key={t.id} className="text-sm">{t.emoji}</span>
+                  ))}
+                  {relatedTiles.length > 5 && (
+                    <span className="text-[10px] text-slate-500">+{relatedTiles.length - 5}</span>
                   )}
                 </div>
-              ))}
-              {selectedTile.tags.filter(t => !tagRelations.find(r => r.tag === t)).length > 0 && (
-                <div className="flex flex-wrap gap-1 pt-1 border-t border-slate-700">
-                  {selectedTile.tags
-                    .filter(t => !tagRelations.find(r => r.tag === t))
-                    .slice(0, 6)
-                    .map(tag => (<TagPill key={tag} tag={tag} count={tagCounts[tag] || 0} />))}
-                </div>
-              )}
-            </div>
+                {relatedTiles.length >= 2 ? (
+                  <span className="text-[9px] text-green-400 font-bold bg-green-500/10 px-1.5 py-0.5 rounded-full">✓ SET! ({scoreSet(tag, tagCounts)}pt)</span>
+                ) : (
+                  <span className="text-[9px] text-slate-500">need {2 - relatedTiles.length} more → {scoreSet(tag, tagCounts)}pt</span>
+                )}
+              </div>
+            ))}
+            {selectedTile.tags.filter(t => !tagRelations.find(r => r.tag === t)).length > 0 && (
+              <div className="flex flex-wrap gap-1 pt-1 border-t border-slate-700">
+                {selectedTile.tags
+                  .filter(t => !tagRelations.find(r => r.tag === t))
+                  .slice(0, 6)
+                  .map(tag => (<TagPill key={tag} tag={tag} count={tagCounts[tag] || 0} />))}
+              </div>
+            )}
           </div>
-        </>
+        </div>
       )}
 
-      {/* Hand — acts as CSS anchor for the inspector modal */}
+      {/* Hand */}
       <div className="hand-anchor flex flex-wrap gap-1.5 justify-center max-w-md mx-auto items-end relative z-[102]">
+        {/* Locked pon sets */}
         {myLockedSets.map((rs) => (
           <LockedSetView key={rs.tag} tag={rs.tag} tiles={rs.tiles} tagCounts={tagCounts} onTap={handleTap} />
         ))}
 
-        {/* All unlocked tiles in one reorderable list */}
+        {/* All unlocked tiles — flat, draggable */}
         {unlockedHand.length > 0 && (
           <Reorder.Group
             axis="x"
-            values={orderedUngrouped}
-            onReorder={setOrderedUngrouped}
-            className="flex gap-0.5 justify-center flex-wrap w-full"
+            values={orderedTiles}
+            onReorder={setOrderedTiles}
+            className="flex gap-1 justify-center flex-wrap w-full"
             style={{ listStyle: 'none' }}
           >
-            {orderedUngrouped.map((tile, idx) => {
-              // Check if this tile is part of a triplet
-              const tripletGroup = triplets.find(g => g.tiles.some(t => t.id === tile.id))
-              // Check if consecutive tiles form a visual run of the same triplet
-              const prevTile = idx > 0 ? orderedUngrouped[idx - 1] : null
-              const nextTile = idx < orderedUngrouped.length - 1 ? orderedUngrouped[idx + 1] : null
-              const prevInSameGroup = prevTile && tripletGroup && tripletGroup.tiles.some(t => t.id === prevTile.id)
-              const nextInSameGroup = nextTile && tripletGroup && tripletGroup.tiles.some(t => t.id === nextTile.id)
-              const isFirstInRun = tripletGroup && !prevInSameGroup
-              const isLastInRun = tripletGroup && !nextInSameGroup
-
-              return (
-                <Reorder.Item
-                  key={tile.id}
-                  value={tile}
-                  className="touch-none"
-                  whileDrag={{ scale: 1.1, zIndex: 50 }}
-                >
-                  <div className="flex flex-col items-center">
-                    {/* Show tag pill only on first tile of a consecutive run */}
-                    {isFirstInRun && tripletGroup && (
-                      <div className="mb-0.5 flex items-center gap-0.5">
-                        <TagPill tag={tripletGroup.tag} />
-                        <span className="text-[8px] text-amber-400 font-bold">{scoreSet(tripletGroup.tag, tagCounts)}pt</span>
-                      </div>
-                    )}
-                    {/* Spacer for non-first-in-run triplet tiles to align */}
-                    {tripletGroup && !isFirstInRun && (
-                      <div className="mb-0.5 h-[18px]" />
-                    )}
-                    <div className={
-                      tripletGroup
-                        ? `${isFirstInRun ? 'rounded-l-xl pl-1' : ''} ${isLastInRun ? 'rounded-r-xl pr-1' : ''} bg-slate-700/30 border-t border-b border-slate-600/50 ${isFirstInRun ? 'border-l' : ''} ${isLastInRun ? 'border-r' : ''} py-1`
-                        : ''
-                    }>
-                      <TileView
-                        tile={tile}
-                        size="lg"
-                        selected={selectedTileId === tile.id}
-                        highlighted={hasSelection && relatedTileIds.has(tile.id)}
-                        dimmed={hasSelection && tile.id !== selectedTileId && !relatedTileIds.has(tile.id)}
-                        newlyDrawn={tile.id === lastDrawnTileId}
-                        onClick={() => handleTap(tile.id)}
-                      />
-                    </div>
-                  </div>
-                </Reorder.Item>
-              )
-            })}
+            {orderedTiles.map((tile) => (
+              <Reorder.Item
+                key={tile.id}
+                value={tile}
+                className="touch-none"
+                whileDrag={{ scale: 1.1, zIndex: 50 }}
+              >
+                <TileView
+                  tile={tile}
+                  size="lg"
+                  selected={selectedTileId === tile.id}
+                  highlighted={hasSelection && relatedTileIds.has(tile.id)}
+                  dimmed={hasSelection && tile.id !== selectedTileId && !relatedTileIds.has(tile.id)}
+                  newlyDrawn={tile.id === lastDrawnTileId}
+                  onClick={() => handleTap(tile.id)}
+                />
+              </Reorder.Item>
+            ))}
           </Reorder.Group>
         )}
       </div>
 
-      {/* Progress bar with score */}
-      <ProgressBar current={totalSets} total={4} score={
-        Math.round((
-          myLockedSets.reduce((s, rs) => s + scoreSet(rs.tag, tagCounts), 0) +
-          triplets.reduce((s, g) => s + scoreSet(g.tag, tagCounts), 0)
-        ) * 10) / 10
-      } />
+      {/* Progress bar */}
+      <ProgressBar current={myLockedSets.length} total={4} />
     </div>
   )
 }
