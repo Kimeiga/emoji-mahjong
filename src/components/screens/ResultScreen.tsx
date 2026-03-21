@@ -10,7 +10,7 @@ import { findDisplayTriplets } from '../../engine/triplet-display'
 import { getStats, recordResult } from '../../utils/stats'
 
 export function ResultScreen() {
-  const { phase, winner, players, myPlayerId, mode, turnCount, gameStartTime, tagCounts } = useGame()
+  const { phase, winner, players, myPlayerId, mode, turnCount, gameStartTime, tagCounts, revealedSets } = useGame()
   const startGame = useGameStore((s) => s.startGame)
   const setScreen = useAppStore((s) => s.setScreen)
   const disconnect = useAppStore((s) => s.disconnect)
@@ -21,10 +21,24 @@ export function ResultScreen() {
   const winnerPlayer = winner !== null ? players[winner] : null
   const isHumanWin = winner === myPlayerId
 
-  const triplets = useMemo(() => {
-    if (!winnerPlayer) return []
-    return findDisplayTriplets(winnerPlayer.hand, 4, tagCounts)
-  }, [winnerPlayer, tagCounts])
+  // Combine pon melds + hand triplets for the winner
+  const allSets = useMemo(() => {
+    if (!winnerPlayer || winner === null) return []
+    // Pon melds (already locked)
+    const ponSets = revealedSets
+      .filter(rs => rs.playerId === winner)
+      .map(rs => ({
+        tag: rs.tag,
+        tiles: rs.tiles,
+        score: Math.round(80 / (tagCounts[rs.tag] || 80)),
+      }))
+    // Find remaining triplets from hand tiles (excluding pon'd tiles)
+    const ponTileIds = new Set(ponSets.flatMap(s => s.tiles.map(t => t.id)))
+    const handOnly = winnerPlayer.hand.filter(t => !ponTileIds.has(t.id))
+    const remaining = 4 - ponSets.length
+    const handTriplets = remaining > 0 ? findDisplayTriplets(handOnly, remaining, tagCounts) : []
+    return [...ponSets, ...handTriplets]
+  }, [winnerPlayer, winner, tagCounts, revealedSets])
 
   const elapsedSecs = Math.floor((Date.now() - gameStartTime) / 1000)
   const mins = Math.floor(elapsedSecs / 60)
@@ -79,15 +93,15 @@ export function ResultScreen() {
         </div>
 
         {/* Winner's sets with scores */}
-        {!isDraw && winnerPlayer && triplets.length > 0 && (() => {
-          const total = triplets.reduce((sum, g) => sum + g.score, 0)
+        {!isDraw && winnerPlayer && allSets.length > 0 && (() => {
+          const total = allSets.reduce((sum, g) => sum + g.score, 0)
           return (
             <>
               <div className="mt-3 text-2xl font-black text-amber-400">
                 {total} points
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2 max-w-sm mx-auto">
-                {triplets.map((group, gi) => (
+                {allSets.map((group, gi) => (
                   <motion.div
                     key={group.tag}
                     initial={{ y: 20, opacity: 0 }}
