@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { PlayerId, Tile, Player, GamePhase, PonInfo, RevealedSet } from '../types'
 import type { GameStateView, LobbyPlayer, AIDifficulty, ServerMessage } from '../multiplayer/protocol'
+import { playPon, playRiichi, playWin } from '../audio/sounds'
 
 interface MultiplayerState {
   // Game state (mirrors GameState)
@@ -130,14 +131,19 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
           aiDifficulty: msg.aiDifficulty,
         })
         break
-      case 'game-state':
-        set({ ...convertGameState(msg.state), selectedTileId: null })
+      case 'game-state': {
+        const converted = convertGameState(msg.state)
+        set({ ...converted, selectedTileId: null })
+        if (converted.phase === 'win') playWin()
         break
+      }
       case 'toast':
         if (msg.kind === 'pon') {
           set({ lastPonEvent: { playerName: msg.playerName, emoji: msg.emoji, tag: msg.tag } })
+          playPon()
         } else if (msg.kind === 'riichi') {
           set({ lastRiichiEvent: { playerName: msg.playerName } })
+          playRiichi()
         }
         break
       case 'player-joined':
@@ -160,7 +166,7 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
         break
       case 'rematch-starting':
         set({
-          phase: 'idle',
+          phase: 'draw',
           players: [emptyPlayer(0), emptyPlayer(1), emptyPlayer(2), emptyPlayer(3)],
           wallCount: 0,
           currentPlayer: 0 as PlayerId,
@@ -171,6 +177,7 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
           revealedSets: [],
           market: [],
           tagCounts: {},
+          gameStarted: true,
           rematchVotes: null,
           lastPonEvent: null,
           lastRiichiEvent: null,

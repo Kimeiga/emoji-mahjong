@@ -249,35 +249,58 @@ export function MenuScreen() {
 
   // Check for saved session to reconnect
   useEffect(() => {
-    const session = getSession()
+    let session: ReturnType<typeof getSession> = null
+    try {
+      session = getSession()
+    } catch {
+      // localStorage may throw in some environments
+      return
+    }
     if (session) {
       setReconnecting(true)
+
+      // Timeout: if reconnection takes more than 5 seconds, give up
+      const timeout = setTimeout(() => {
+        clearSession()
+        setReconnecting(false)
+      }, 5000)
+
       const ws = connectToRoom(session.roomCode)
       ws.onopen = () => {
-        sendMessage(ws, { type: 'join', playerName: session.playerName })
+        sendMessage(ws, { type: 'join', playerName: session!.playerName })
         setWs(ws)
-        setRoomCode(session.roomCode)
-        setMyPlayerId(session.myPlayerId)
+        setRoomCode(session!.roomCode)
+        setMyPlayerId(session!.myPlayerId)
       }
       ws.onmessage = (event) => {
         const msg = parseServerMessage(event.data)
         if (!msg) return
+        if (msg.type === 'error') {
+          clearTimeout(timeout)
+          clearSession()
+          setReconnecting(false)
+          return
+        }
         if (msg.type === 'assigned') setMyPlayerId(msg.playerId)
         applyServerMessage(msg)
         if (msg.type === 'game-state') {
+          clearTimeout(timeout)
           setScreen('multiplayer-game')
           setReconnecting(false)
         }
         if (msg.type === 'room-state') {
+          clearTimeout(timeout)
           setScreen('lobby')
           setReconnecting(false)
         }
       }
       ws.onerror = () => {
+        clearTimeout(timeout)
         clearSession()
         setReconnecting(false)
       }
       ws.onclose = () => {
+        clearTimeout(timeout)
         setWs(null)
         setReconnecting(false)
       }

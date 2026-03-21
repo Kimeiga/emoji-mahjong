@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { GameState, Player, PlayerId, Tile } from '../types'
 import { GameRunner } from '../engine/game-runner'
+import { playGameStart, playDraw, playDiscard, playPon, playRiichi, playWin } from '../audio/sounds'
 
 const runner = new GameRunner()
 
@@ -73,6 +74,7 @@ export const useGameStore = create<Store>((set) => {
 
     startGame: () => {
       runner.start()
+      playGameStart()
       set({ ...stateFromRunner(), lastPonEvent: null, lastRiichiEvent: null, gameStartTime: Date.now() })
     },
 
@@ -81,6 +83,7 @@ export const useGameStore = create<Store>((set) => {
         runner.draw()
         const drawnId = runner.getState().lastDrawnTileId
         set({ ...stateFromRunner(), lastDrawnTileId: drawnId })
+        playDraw()
         // Clear drawn highlight after 1.5s
         if (drawnId) {
           setTimeout(() => set({ lastDrawnTileId: null }), 1500)
@@ -95,6 +98,7 @@ export const useGameStore = create<Store>((set) => {
         runner.pickMarket(tileId)
         const drawnId = runner.getState().lastDrawnTileId
         set({ ...stateFromRunner(), lastDrawnTileId: drawnId })
+        playDraw()
         if (drawnId) {
           setTimeout(() => set({ lastDrawnTileId: null }), 1500)
         }
@@ -108,6 +112,7 @@ export const useGameStore = create<Store>((set) => {
         runner.drawBlind()
         const drawnId = runner.getState().lastDrawnTileId
         set({ ...stateFromRunner(), lastDrawnTileId: drawnId })
+        playDraw()
         if (drawnId) {
           setTimeout(() => set({ lastDrawnTileId: null }), 1500)
         }
@@ -122,6 +127,8 @@ export const useGameStore = create<Store>((set) => {
       try {
         runner.discard(tileId)
         set({ ...stateFromRunner(), lastDrawnTileId: null })
+        playDiscard()
+        if (runner.getState().phase === 'win') playWin()
       } catch {
         // ignore
       }
@@ -146,6 +153,8 @@ export const useGameStore = create<Store>((set) => {
         const tag = pon.matchingTag
         runner.callPon(playerId)
         set({ ...stateFromRunner(), lastPonEvent: { playerName, emoji, tag } })
+        playPon()
+        if (runner.getState().phase === 'win') playWin()
       } catch {
         // ignore
       }
@@ -165,6 +174,7 @@ export const useGameStore = create<Store>((set) => {
         const playerName = runner.getState().players[playerId].name
         runner.declareRiichi(playerId)
         set({ ...stateFromRunner(), lastRiichiEvent: { playerName } })
+        playRiichi()
       } catch {
         // ignore
       }
