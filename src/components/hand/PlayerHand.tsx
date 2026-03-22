@@ -23,7 +23,7 @@ function SortableTile({ tile, selected, highlighted, dimmed, newlyDrawn, onClick
   }
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners} onClick={onClick}>
       <TileView
         tile={tile}
         size="lg"
@@ -31,7 +31,6 @@ function SortableTile({ tile, selected, highlighted, dimmed, newlyDrawn, onClick
         highlighted={highlighted}
         dimmed={dimmed}
         newlyDrawn={newlyDrawn}
-        onClick={onClick}
       />
     </div>
   )
