@@ -10,7 +10,20 @@ import { LobbyScreen } from './components/screens/LobbyScreen'
 import { GameScreen } from './components/screens/GameScreen'
 import { ResultScreen } from './components/screens/ResultScreen'
 import TutorialOverlay from './components/screens/TutorialOverlay'
-import type { PlayerId } from './types'
+import type { Player, PlayerId, PonInfo, RevealedSet, Tile } from './types'
+
+interface DebugGameState {
+  phase: string
+  currentPlayer: PlayerId
+  myPlayerId: PlayerId
+  turnCount: number
+  wallCount: number
+  market?: Tile[]
+  winner: PlayerId | null
+  players?: Player[]
+  revealedSets?: RevealedSet[]
+  ponAvailable?: PonInfo | null
+}
 
 function SinglePlayerGame() {
   const aiDifficulty = useAppStore((s) => s.aiDifficulty)
@@ -136,7 +149,8 @@ function App() {
 
   function copyDebug() {
     try {
-      const gs = (window as any).__gameState?.()
+      const debugWindow = window as Window & { __gameState?: () => DebugGameState }
+      const gs = debugWindow.__gameState?.()
       const appState = useAppStore.getState()
       const debug = {
         version: 'v62',
@@ -152,13 +166,13 @@ function App() {
           wallCount: gs.wallCount,
           marketLen: gs.market?.length,
           winner: gs.winner,
-          players: gs.players?.map((p: any) => ({
+          players: gs.players?.map((p) => ({
             id: p.id, name: p.name, isHuman: p.isHuman, riichi: p.riichi,
             handSize: p.hand?.length, discardCount: p.discards?.length,
           })),
-          revealedSets: gs.revealedSets?.map((rs: any) => ({
+          revealedSets: gs.revealedSets?.map((rs) => ({
             playerId: rs.playerId, tag: rs.tag,
-            tiles: rs.tiles?.map((t: any) => t.emoji).join(''),
+            tiles: rs.tiles?.map((t) => t.emoji).join(''),
           })),
           ponAvailable: gs.ponAvailable ? {
             playerId: gs.ponAvailable.playerId,

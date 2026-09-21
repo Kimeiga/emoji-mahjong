@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef } from 'react'
+import { useMemo, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useGame } from '../../contexts/GameContext'
 import { useGameStore } from '../../store/game-store'
@@ -40,7 +40,8 @@ export function ResultScreen() {
     return [...ponSets, ...handTriplets]
   }, [winnerPlayer, winner, tagCounts, revealedSets])
 
-  const elapsedSecs = Math.floor((Date.now() - gameStartTime) / 1000)
+  const [gameEndTime] = useState(Date.now)
+  const elapsedSecs = Math.max(0, Math.floor((gameEndTime - gameStartTime) / 1000))
   const mins = Math.floor(elapsedSecs / 60)
   const secs = elapsedSecs % 60
 

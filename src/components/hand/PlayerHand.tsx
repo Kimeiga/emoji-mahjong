@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor,
   useSensor, useSensors, type DragEndEvent,
@@ -109,16 +109,17 @@ export function PlayerHand() {
     [hand, lockedTileIds]
   )
 
-  // Ordered tiles for drag-to-reorder (synced with hand changes)
-  const [orderedTiles, setOrderedTiles] = useState(unlockedHand)
-  useEffect(() => {
-    const currentIds = new Set(unlockedHand.map(t => t.id))
-    const kept = orderedTiles.filter(t => currentIds.has(t.id))
-    const added = unlockedHand.filter(t => !kept.find(o => o.id === t.id))
-    if (added.length > 0 || kept.length !== orderedTiles.length) {
-      setOrderedTiles([...kept, ...added])
-    }
-  }, [unlockedHand])
+  // Keep only the user's drag preference as state. Derive the current tile list
+  // from the live hand so draws/discards do not require synchronizing state in an effect.
+  const [orderedTileIds, setOrderedTileIds] = useState<string[]>([])
+  const orderedTiles = useMemo(() => {
+    const byId = new Map(unlockedHand.map(tile => [tile.id, tile]))
+    const ordered = orderedTileIds
+      .map(id => byId.get(id))
+      .filter((tile): tile is Tile => tile !== undefined)
+    const orderedIds = new Set(ordered.map(tile => tile.id))
+    return [...ordered, ...unlockedHand.filter(tile => !orderedIds.has(tile.id))]
+  }, [unlockedHand, orderedTileIds])
 
   // dnd-kit sensors: require 8px movement to start drag (distinguishes from tap)
   const sensors = useSensors(
@@ -129,15 +130,13 @@ export function PlayerHand() {
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     if (!over || active.id === over.id) return
-    setOrderedTiles(prev => {
-      const oldIdx = prev.findIndex(t => t.id === active.id)
-      const newIdx = prev.findIndex(t => t.id === over.id)
-      if (oldIdx === -1 || newIdx === -1) return prev
-      const next = [...prev]
-      const [moved] = next.splice(oldIdx, 1)
-      next.splice(newIdx, 0, moved)
-      return next
-    })
+    const next = orderedTiles.map(tile => tile.id)
+    const oldIdx = next.findIndex(id => id === active.id)
+    const newIdx = next.findIndex(id => id === over.id)
+    if (oldIdx === -1 || newIdx === -1) return
+    const [moved] = next.splice(oldIdx, 1)
+    next.splice(newIdx, 0, moved)
+    setOrderedTileIds(next)
   }
 
   const tagRelations = useMemo(() => {

@@ -224,5 +224,5 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
 }))
 
 if (typeof window !== 'undefined') {
-  (window as any).__gameState = () => useMultiplayerStore.getState()
+  ;(window as Window & { __gameState?: () => unknown }).__gameState = () => useMultiplayerStore.getState()
 }

@@ -7,7 +7,7 @@ import { playGameStart, playDraw, playDiscard, playPon, playRiichi, playWin } fr
 const runner = new GameRunner()
 
 if (typeof window !== 'undefined') {
-  ;(window as any).__game = runner
+  ;(window as Window & { __game?: GameRunner }).__game = runner
 }
 
 interface GameActions {
