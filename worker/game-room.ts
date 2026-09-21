@@ -6,8 +6,8 @@
  */
 
 import { GameRunner } from '../src/engine/game-runner'
-import type { GameSnapshot } from '../src/engine/game-runner'
-import { shouldAICallPon, calculateAIMarketPick } from '../src/engine/ai'
+import type { GameRunnerState, GameSnapshot } from '../src/engine/game-runner'
+import { shouldAICallPon } from '../src/engine/ai'
 import type {
   AIDifficulty,
   ClientMessage,
@@ -26,6 +26,17 @@ interface Env {
   ROOM_REGISTRY: DurableObjectNamespace
 }
 
+const ROOM_STATE_KEY = 'game-room-state'
+
+interface PersistedRoomState {
+  roomCode: string
+  aiDifficulty: AIDifficulty
+  lobbyPlayers: LobbyPlayer[]
+  gameStarted: boolean
+  rematchVotes: PlayerId[]
+  runnerState: GameRunnerState | null
+}
+
 export class GameRoom implements DurableObject {
   private players: Map<WebSocket, PlayerInfo> = new Map()
   private runner: GameRunner | null = null
@@ -41,6 +52,42 @@ export class GameRoom implements DurableObject {
   constructor(ctx: DurableObjectState, env: Env) {
     this.ctx = ctx
     this.env = env
+
+    this.ctx.blockConcurrencyWhile(async () => {
+      const persisted = await this.ctx.storage.get<PersistedRoomState>(ROOM_STATE_KEY)
+      if (!persisted) return
+
+      this.roomCode = persisted.roomCode
+      this.aiDifficulty = persisted.aiDifficulty
+      this.lobbyPlayers = persisted.lobbyPlayers
+      this.gameStarted = persisted.gameStarted
+      this.rematchVotes = new Set(persisted.rematchVotes)
+
+      if (persisted.runnerState) {
+        this.runner = new GameRunner({ aiDifficulty: this.aiDifficulty })
+        this.runner.restoreState(persisted.runnerState)
+      }
+    })
+  }
+
+  private persistState() {
+    const persisted: PersistedRoomState = {
+      roomCode: this.roomCode,
+      aiDifficulty: this.aiDifficulty,
+      lobbyPlayers: this.lobbyPlayers,
+      gameStarted: this.gameStarted,
+      rematchVotes: [...this.rematchVotes],
+      runnerState: this.runner?.exportState() ?? null,
+    }
+    void this.ctx.storage.put(ROOM_STATE_KEY, persisted).catch((error) => {
+      console.error('[game-room] Failed to persist state', error)
+    })
+  }
+
+  private clearPersistedState() {
+    void this.ctx.storage.delete(ROOM_STATE_KEY).catch((error) => {
+      console.error('[game-room] Failed to clear persisted state', error)
+    })
   }
 
   private async updateRegistry() {
@@ -132,7 +179,7 @@ export class GameRoom implements DurableObject {
         this.handleCallPon(ws)
         break
       case 'decline-pon':
-        this.handleDeclinePon()
+        this.handleDeclinePon(ws)
         break
       case 'declare-riichi':
         this.handleDeclareRiichi(ws)
@@ -168,6 +215,8 @@ export class GameRoom implements DurableObject {
         this.send(ws, { type: 'assigned', playerId: existing.id })
         this.broadcastRoomState()
         this.sendGameStateToPlayer(ws, existing.id)
+        this.persistState()
+        this.scheduleAITurns()
         return
       }
       this.send(ws, { type: 'error', message: 'Game already started' })
@@ -201,12 +250,14 @@ export class GameRoom implements DurableObject {
     this.send(ws, { type: 'assigned', playerId: seatId })
     this.broadcastRoomState()
     this.updateRegistry()
+    this.persistState()
   }
 
   private handleSetAIDifficulty(difficulty: AIDifficulty) {
     if (this.gameStarted) return
     this.aiDifficulty = difficulty
     this.broadcastRoomState()
+    this.persistState()
   }
 
   private handleStart() {
@@ -240,6 +291,7 @@ export class GameRoom implements DurableObject {
     this.broadcastGameState()
 
     // If player 0 is AI, kick off AI turns
+    this.persistState()
     this.scheduleAITurns()
   }
 
@@ -267,6 +319,7 @@ export class GameRoom implements DurableObject {
 
     this.broadcastGameState()
     this.checkPonToasts()
+    this.persistState()
     this.scheduleAITurns()
   }
 
@@ -299,21 +352,30 @@ export class GameRoom implements DurableObject {
     }
 
     this.broadcastGameState()
+    this.persistState()
     this.scheduleAITurns()
   }
 
-  private handleDeclinePon() {
+  private handleDeclinePon(ws: WebSocket) {
     if (!this.runner || !this.gameStarted) return
+    const info = this.players.get(ws)
+    if (!info) return
+
     const state = this.runner.getState()
-    if (state.phase !== 'pon-available') return
+    if (state.phase !== 'pon-available' || !state.ponAvailable) return
+    if (state.ponAvailable.playerId !== info.playerId) {
+      this.send(ws, { type: 'error', message: 'This PON decision belongs to another player' })
+      return
+    }
 
     try {
       this.runner.declinePon()
-    } catch (e: any) {
+    } catch {
       return
     }
 
     this.broadcastGameState()
+    this.persistState()
     this.scheduleAITurns()
   }
 
@@ -335,6 +397,7 @@ export class GameRoom implements DurableObject {
     }
 
     this.broadcastGameState()
+    this.persistState()
   }
 
   private handlePickMarket(ws: WebSocket, tileId: string) {
@@ -350,6 +413,7 @@ export class GameRoom implements DurableObject {
       return
     }
     this.broadcastGameState()
+    this.persistState()
     this.scheduleAITurns()
   }
 
@@ -366,6 +430,7 @@ export class GameRoom implements DurableObject {
       return
     }
     this.broadcastGameState()
+    this.persistState()
     this.scheduleAITurns()
   }
 
@@ -374,6 +439,7 @@ export class GameRoom implements DurableObject {
     if (!info) return
 
     this.rematchVotes.add(info.playerId)
+    this.persistState()
 
     const humanCount = this.lobbyPlayers.filter(p => p.isHuman && p.connected).length
     this.broadcast({ type: 'rematch-votes', count: this.rematchVotes.size, total: humanCount })
@@ -391,6 +457,7 @@ export class GameRoom implements DurableObject {
       this.broadcast({ type: 'rematch-starting' })
       this.broadcastRoomState()
       this.broadcastGameState()
+      this.persistState()
       this.scheduleAITurns()
     }
   }
@@ -404,14 +471,16 @@ export class GameRoom implements DurableObject {
       this.broadcastRoomState()
     }
 
-    // If all human players have disconnected, clean up
+    // Preserve started games so a deployment, reload, or temporary network loss
+    // cannot erase the match before clients reconnect.
     const anyConnected = this.lobbyPlayers.some((p) => p.isHuman && p.connected)
-    if (!anyConnected && this.players.size === 0) {
+    if (!anyConnected && this.players.size === 0 && !this.gameStarted) {
       this.runner = null
-      this.gameStarted = false
       this.lobbyPlayers = []
+      this.clearPersistedState()
       this.removeFromRegistry()
     } else {
+      this.persistState()
       this.updateRegistry()
     }
   }
@@ -464,6 +533,7 @@ export class GameRoom implements DurableObject {
       phase: snapshot.phase,
       currentPlayer: snapshot.currentPlayer,
       turnCount: snapshot.turnCount,
+      gameStartTime: snapshot.gameStartTime,
       wallSize: snapshot.wallSize,
       winner: snapshot.winner,
       myPlayerId: playerId,
@@ -572,6 +642,7 @@ export class GameRoom implements DurableObject {
     }
 
     this.broadcastGameState()
+    this.persistState()
     this.scheduleAITurns()
   }
 
@@ -581,26 +652,14 @@ export class GameRoom implements DurableObject {
     if (state.phase !== 'draw') return
     if (this.isHumanPlayer(state.currentPlayer)) return
 
-    // AI picks from market or draws blind
-    const hand = state.players[state.currentPlayer].hand
-    const pick = calculateAIMarketPick(hand, state.market, this.aiDifficulty)
-
     try {
-      if (pick) {
-        this.runner.pickMarket(pick.id)
-      } else {
-        this.runner.drawBlind()
-      }
+      this.runner.aiDraw()
     } catch {
-      // If drawBlind fails (wall empty), try market
-      if (state.market.length > 0) {
-        try { this.runner.pickMarket(state.market[0].id) } catch { return }
-      } else {
-        return
-      }
+      return
     }
 
     this.broadcastGameState()
+    this.persistState()
 
     // After drawing, the AI needs to discard
     const newState = this.runner.getState()
@@ -624,6 +683,7 @@ export class GameRoom implements DurableObject {
     }
 
     this.broadcastGameState()
+    this.persistState()
     this.scheduleAITurns()
   }
 }

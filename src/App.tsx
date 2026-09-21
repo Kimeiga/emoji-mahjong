@@ -78,6 +78,7 @@ function MultiplayerGame() {
   const wallCount = useMultiplayerStore((s) => s.wallCount)
   const currentPlayer = useMultiplayerStore((s) => s.currentPlayer)
   const turnCount = useMultiplayerStore((s) => s.turnCount)
+  const gameStartTime = useMultiplayerStore((s) => s.gameStartTime)
   const selectedTileId = useMultiplayerStore((s) => s.selectedTileId)
   const winner = useMultiplayerStore((s) => s.winner)
   const ponAvailable = useMultiplayerStore((s) => s.ponAvailable)
@@ -95,7 +96,7 @@ function MultiplayerGame() {
     mode: 'multiplayer',
     phase, players, wallCount, currentPlayer, turnCount,
     selectedTileId, winner, ponAvailable, revealedSets, market, tagCounts, myPlayerId,
-    lastDrawnTileId: null, gameStartTime: Date.now(),
+    lastDrawnTileId: null, gameStartTime,
     selectTile,
     discardTile: (id: string) => { if (ws) sendMessage(ws, { type: 'discard', tileId: id }) },
     callPon: () => { if (ws) sendMessage(ws, { type: 'call-pon' }) },

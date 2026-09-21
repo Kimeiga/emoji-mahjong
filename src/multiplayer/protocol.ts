@@ -60,6 +60,7 @@ export interface GameStateView {
   phase: string
   currentPlayer: PlayerId
   turnCount: number
+  gameStartTime: number
   wallSize: number
   winner: PlayerId | null
   myPlayerId: PlayerId
