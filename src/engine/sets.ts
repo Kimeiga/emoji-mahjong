@@ -1,4 +1,4 @@
-import type { Tile } from '../types'
+import type { RevealedSet, Tile } from '../types'
 import { HAND_SIZE, WIN_SIZE, TRIPLETS_TO_WIN } from '../data/emojis'
 
 /**
@@ -17,6 +17,27 @@ export function isValidTriplet(a: Tile, b: Tile, c: Tile): boolean {
 export function isWinningHand(hand: Tile[]): boolean {
   if (hand.length !== WIN_SIZE) return false
   return canFormTriplets(hand, TRIPLETS_TO_WIN)
+}
+
+/**
+ * Check a winning hand while preserving already-revealed melds exactly as claimed.
+ * Revealed sets are locked to their recorded tags and cannot be repartitioned.
+ */
+export function isWinningWithRevealedSets(hand: Tile[], revealedSets: RevealedSet[]): boolean {
+  const meldTileCount = revealedSets.reduce((sum, set) => sum + set.tiles.length, 0)
+  if (hand.length + meldTileCount !== WIN_SIZE) return false
+  if (revealedSets.length > TRIPLETS_TO_WIN) return false
+
+  const usedTags = new Set<string>()
+  for (const set of revealedSets) {
+    if (set.tiles.length !== 3) return false
+    if (new Set(set.tiles.map(tile => tile.id)).size !== 3) return false
+    if (usedTags.has(set.tag)) return false
+    if (!set.tiles.every(tile => tile.tags.includes(set.tag))) return false
+    usedTags.add(set.tag)
+  }
+
+  return canFormTriplets(hand, TRIPLETS_TO_WIN - revealedSets.length, usedTags)
 }
 
 /** Check if tiles can be fully decomposed into N valid triplets with unique tags */

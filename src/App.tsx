@@ -13,6 +13,7 @@ import TutorialOverlay from './components/screens/TutorialOverlay'
 import type { PlayerId } from './types'
 
 function SinglePlayerGame() {
+  const aiDifficulty = useAppStore((s) => s.aiDifficulty)
   const phase = useGameStore((s) => s.phase)
   const players = useGameStore((s) => s.players)
   const wall = useGameStore((s) => s.wall)
@@ -43,7 +44,7 @@ function SinglePlayerGame() {
   useAutoPlay('local')
 
   useEffect(() => {
-    startGame()
+    startGame(aiDifficulty)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -137,7 +138,7 @@ function App() {
       const gs = (window as any).__gameState?.()
       const appState = useAppStore.getState()
       const debug = {
-        version: 'v57',
+        version: 'v62',
         time: new Date().toISOString(),
         screen: appState.screen,
         myPlayerId: appState.myPlayerId,
@@ -184,7 +185,7 @@ function App() {
         debug
       </button>
       <div className="fixed bottom-1 right-2 text-[9px] text-slate-600/40 pointer-events-none z-0">
-        v61
+        v62
       </div>
     </>
   )

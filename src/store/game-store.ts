@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type { GameState, Player, PlayerId, Tile } from '../types'
+import type { AIDifficulty } from '../multiplayer/protocol'
 import { GameRunner } from '../engine/game-runner'
 import { playGameStart, playDraw, playDiscard, playPon, playRiichi, playWin } from '../audio/sounds'
 
@@ -10,8 +11,9 @@ if (typeof window !== 'undefined') {
 }
 
 interface GameActions {
-  startGame: () => void
+  startGame: (aiDifficulty?: AIDifficulty) => void
   drawCurrentPlayer: () => void
+  aiDraw: () => void
   pickMarket: (tileId: string) => void
   drawBlind: () => void
   selectTile: (tileId: string | null) => void
@@ -70,12 +72,18 @@ export const useGameStore = create<Store>((set) => {
     lastPonEvent: null,
     lastRiichiEvent: null,
     lastDrawnTileId: null,
-    gameStartTime: Date.now(),
+    gameStartTime: 0,
 
-    startGame: () => {
+    startGame: (aiDifficulty) => {
+      if (aiDifficulty) runner.aiDifficulty = aiDifficulty
       runner.start()
       playGameStart()
-      set({ ...stateFromRunner(), lastPonEvent: null, lastRiichiEvent: null, gameStartTime: Date.now() })
+      set({
+        ...stateFromRunner(),
+        lastPonEvent: null,
+        lastRiichiEvent: null,
+        gameStartTime: runner.getState().gameStartTime,
+      })
     },
 
     drawCurrentPlayer: () => {
@@ -134,6 +142,16 @@ export const useGameStore = create<Store>((set) => {
       }
     },
 
+    aiDraw: () => {
+      try {
+        runner.aiDraw()
+        set(stateFromRunner())
+        playDraw()
+      } catch {
+        // ignore
+      }
+    },
+
     aiTurn: () => {
       try {
         runner.aiTurn()
@@ -182,7 +200,7 @@ export const useGameStore = create<Store>((set) => {
 
     resetGame: () => {
       runner.reset()
-      set({ ...stateFromRunner(), lastPonEvent: null, lastRiichiEvent: null })
+      set({ ...stateFromRunner(), lastPonEvent: null, lastRiichiEvent: null, gameStartTime: 0 })
     },
 
     syncFromRunner: () => set(stateFromRunner()),
