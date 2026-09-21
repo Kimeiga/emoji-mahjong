@@ -6,7 +6,7 @@
  */
 
 import { GameRunner } from '../src/engine/game-runner'
-import type { GameSnapshot } from '../src/engine/game-runner'
+import type { GameRunnerState } from '../src/engine/game-runner'
 import { shouldAICallPon, calculateAIMarketPick } from '../src/engine/ai'
 import type {
   AIDifficulty,
@@ -50,7 +50,7 @@ export class GameRoom implements DurableObject {
         lobbyPlayers: LobbyPlayer[]
         gameStarted: boolean
         gameStartedAt: number
-        runnerState: GameSnapshot | null
+        runnerState: GameRunnerState | null
       }>('game-room-state')
 
       if (!saved) return
@@ -65,7 +65,7 @@ export class GameRoom implements DurableObject {
 
       if (saved.gameStarted && saved.runnerState) {
         this.runner = new GameRunner({ aiDifficulty: saved.aiDifficulty })
-        this.runner.restore(saved.runnerState as unknown as import('../src/engine/game-runner').GameRunnerState)
+        this.runner.restore(saved.runnerState)
       }
     })
   }
