@@ -33,6 +33,7 @@ export class GameRoom implements DurableObject {
   private aiDifficulty: AIDifficulty = 'medium'
   private lobbyPlayers: LobbyPlayer[] = []
   private gameStarted = false
+  private gameStartedAt = 0
   private rematchVotes: Set<PlayerId> = new Set()
   private aiTimer: ReturnType<typeof setTimeout> | null = null
   private ctx: DurableObjectState
@@ -132,7 +133,7 @@ export class GameRoom implements DurableObject {
         this.handleCallPon(ws)
         break
       case 'decline-pon':
-        this.handleDeclinePon()
+        this.handleDeclinePon(ws)
         break
       case 'declare-riichi':
         this.handleDeclareRiichi(ws)
@@ -234,6 +235,7 @@ export class GameRoom implements DurableObject {
     const playerConfig = sortedPlayers.map(lp => ({ name: lp.name, isHuman: lp.isHuman }))
     this.runner.start(playerConfig)
     this.gameStarted = true
+    this.gameStartedAt = Date.now()
     this.updateRegistry()
 
     this.broadcastRoomState()
@@ -302,10 +304,16 @@ export class GameRoom implements DurableObject {
     this.scheduleAITurns()
   }
 
-  private handleDeclinePon() {
+  private handleDeclinePon(ws: WebSocket) {
     if (!this.runner || !this.gameStarted) return
+    const info = this.players.get(ws)
+    if (!info) return
     const state = this.runner.getState()
-    if (state.phase !== 'pon-available') return
+    if (state.phase !== 'pon-available' || !state.ponAvailable) return
+    if (state.ponAvailable.playerId !== info.playerId) {
+      this.send(ws, { type: 'error', message: 'This pon decision belongs to another player' })
+      return
+    }
 
     try {
       this.runner.declinePon()
@@ -387,6 +395,7 @@ export class GameRoom implements DurableObject {
       const playerConfig = sortedPlayers.map(lp => ({ name: lp.name, isHuman: lp.isHuman }))
       this.runner.start(playerConfig)
       this.gameStarted = true
+      this.gameStartedAt = Date.now()
 
       this.broadcast({ type: 'rematch-starting' })
       this.broadcastRoomState()
@@ -409,6 +418,7 @@ export class GameRoom implements DurableObject {
     if (!anyConnected && this.players.size === 0) {
       this.runner = null
       this.gameStarted = false
+      this.gameStartedAt = 0
       this.lobbyPlayers = []
       this.removeFromRegistry()
     } else {
@@ -471,6 +481,7 @@ export class GameRoom implements DurableObject {
       revealedSets: snapshot.revealedSets,
       market: snapshot.market,
       tagCounts: snapshot.tagCounts,
+      gameStartedAt: this.gameStartedAt,
       players: snapshot.players.map((p) => {
         // Use lobby player names/isHuman (runner names may not persist)
         const lp = this.lobbyPlayers.find(l => l.id === p.id)
