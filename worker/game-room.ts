@@ -461,6 +461,7 @@ export class GameRoom implements DurableObject {
       this.gameStarted = false
       this.gameStartedAt = 0
       this.lobbyPlayers = []
+      this.persistState()
       this.removeFromRegistry()
     } else {
       this.updateRegistry()
