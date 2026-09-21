@@ -16,7 +16,8 @@ export interface TripletGroup {
 export function findDisplayTriplets(
   hand: Tile[],
   maxTriplets = 4,
-  tagCounts?: Record<string, number>
+  tagCounts?: Record<string, number>,
+  excludedTags: Set<string> = new Set(),
 ): TripletGroup[] {
   // Build tag → tiles map
   const tagGroups = new Map<string, Tile[]>()
@@ -29,7 +30,7 @@ export function findDisplayTriplets(
 
   // Get candidate tag groups (3+ tiles sharing a tag)
   const candidates = [...tagGroups.entries()]
-    .filter(([, tiles]) => tiles.length >= 3)
+    .filter(([tag, tiles]) => tiles.length >= 3 && !excludedTags.has(tag))
     .sort((a, b) => {
       // Sort by score descending (rarest first) to find high-value sets early
       const scoreA = tagCounts ? Math.round(POOL_SIZE / (tagCounts[a[0]] || POOL_SIZE)) : 0
