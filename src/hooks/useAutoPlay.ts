@@ -7,7 +7,7 @@ export function useAutoPlay(mode: 'local' | 'multiplayer' = 'local') {
   const phase = useGameStore((s) => s.phase)
   const currentPlayer = useGameStore((s) => s.currentPlayer)
   const ponAvailable = useGameStore((s) => s.ponAvailable)
-  const drawCurrentPlayer = useGameStore((s) => s.drawCurrentPlayer)
+  const aiDraw = useGameStore((s) => s.aiDraw)
   const discardTile = useGameStore((s) => s.discardTile)
   const aiTurn = useGameStore((s) => s.aiTurn)
   const callPon = useGameStore((s) => s.callPon)
@@ -60,7 +60,7 @@ export function useAutoPlay(mode: 'local' | 'multiplayer' = 'local') {
     if (phase === 'draw') {
       // AI draws after a short delay
       timerRef.current = setTimeout(() => {
-        drawCurrentPlayer()
+        aiDraw()
       }, 600)
     } else if (phase === 'discard') {
       // AI discards after thinking
@@ -70,5 +70,5 @@ export function useAutoPlay(mode: 'local' | 'multiplayer' = 'local') {
     }
 
     return () => clearTimeout(timerRef.current)
-  }, [mode, phase, currentPlayer, ponAvailable, drawCurrentPlayer, discardTile, aiTurn, callPon, declinePon, humanRiichi])
+  }, [mode, phase, currentPlayer, ponAvailable, aiDraw, discardTile, aiTurn, callPon, declinePon, humanRiichi])
 }

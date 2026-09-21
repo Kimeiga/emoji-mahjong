@@ -27,6 +27,16 @@ interface EmojiEntry {
   status: string
 }
 
+interface CldrAnnotation {
+  default?: string[]
+}
+
+interface CldrAnnotationsResponse {
+  annotations?: {
+    annotations?: Record<string, CldrAnnotation>
+  }
+}
+
 // ---- Step 1: Parse emoji-test.txt for groups/subgroups ----
 async function parseEmojiTest(): Promise<Map<string, { name: string; group: string; subgroup: string }>> {
   console.log('Fetching emoji-test.txt...')
@@ -70,10 +80,10 @@ async function fetchAnnotations(): Promise<Map<string, string[]>> {
   for (const url of [CLDR_ANNOTATIONS_URL, CLDR_DERIVED_URL]) {
     try {
       const resp = await fetch(url)
-      const json = await resp.json() as any
-      const annotations = json?.annotations?.annotations ?? {}
+      const json = await resp.json() as CldrAnnotationsResponse
+      const annotations = json.annotations?.annotations ?? {}
 
-      for (const [emoji, data] of Object.entries(annotations) as [string, any][]) {
+      for (const [emoji, data] of Object.entries(annotations)) {
         if (data.default) {
           const existing = map.get(emoji) || []
           const newKeywords = data.default.filter((k: string) => !existing.includes(k))

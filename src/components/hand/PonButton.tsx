@@ -5,12 +5,9 @@ import { TagPill } from '../shared/Tile'
 
 const PON_TIMEOUT_MS = 5000
 
-export function PonButton() {
-  const { phase, ponAvailable, callPon, declinePon, myPlayerId } = useGame()
-
+function PonPrompt() {
+  const { ponAvailable, callPon, declinePon, myPlayerId } = useGame()
   const [countdown, setCountdown] = useState(PON_TIMEOUT_MS)
-
-  const isVisible = phase === 'pon-available' && ponAvailable?.playerId === myPlayerId
 
   const handlePon = useCallback(() => {
     if (ponAvailable) callPon(myPlayerId)
@@ -20,15 +17,9 @@ export function PonButton() {
     declinePon()
   }, [declinePon])
 
-  // Countdown timer
+  // Countdown timer. This component is remounted for each new PON opportunity,
+  // so the initial state is the reset instead of a synchronous effect update.
   useEffect(() => {
-    if (!isVisible) {
-      setCountdown(PON_TIMEOUT_MS)
-      return
-    }
-
-    setCountdown(PON_TIMEOUT_MS)
-
     const interval = setInterval(() => {
       setCountdown((prev) => {
         const next = prev - 50
@@ -41,21 +32,21 @@ export function PonButton() {
     }, 50)
 
     return () => clearInterval(interval)
-  }, [isVisible])
+  }, [])
 
   // Auto-decline on timeout
   useEffect(() => {
-    if (isVisible && countdown <= 0) {
+    if (countdown <= 0) {
       declinePon()
     }
-  }, [isVisible, countdown, declinePon])
+  }, [countdown, declinePon])
 
   const progress = countdown / PON_TIMEOUT_MS
 
+  if (!ponAvailable) return null
+
   return (
-    <AnimatePresence>
-      {isVisible && ponAvailable && (
-        <motion.div
+    <motion.div
           initial={{ y: 200, opacity: 0, scale: 0.8 }}
           animate={{ y: 0, opacity: 1, scale: 1 }}
           exit={{ y: 200, opacity: 0, scale: 0.8, pointerEvents: 'none' as const }}
@@ -156,7 +147,18 @@ export function PonButton() {
               </button>
             </div>
           </motion.div>
-        </motion.div>
+    </motion.div>
+  )
+}
+
+export function PonButton() {
+  const { phase, ponAvailable, myPlayerId } = useGame()
+  const isVisible = phase === 'pon-available' && ponAvailable?.playerId === myPlayerId
+
+  return (
+    <AnimatePresence>
+      {isVisible && ponAvailable && (
+        <PonPrompt key={`${ponAvailable.playerId}-${ponAvailable.tile.id}`} />
       )}
     </AnimatePresence>
   )

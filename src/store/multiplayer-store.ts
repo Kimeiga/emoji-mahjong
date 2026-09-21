@@ -10,6 +10,7 @@ interface MultiplayerState {
   wallCount: number
   currentPlayer: PlayerId
   turnCount: number
+  gameStartTime: number
   selectedTileId: string | null
   winner: PlayerId | null
   ponAvailable: PonInfo | null
@@ -88,6 +89,7 @@ function convertGameState(state: GameStateView): Partial<MultiplayerState> {
     wallCount: state.wallSize,
     currentPlayer: state.currentPlayer,
     turnCount: state.turnCount,
+    gameStartTime: state.gameStartTime,
     winner: state.winner,
     myPlayerId: state.myPlayerId,
     ponAvailable,
@@ -107,6 +109,7 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
   wallCount: 0,
   currentPlayer: 0 as PlayerId,
   turnCount: 0,
+  gameStartTime: 0,
   selectedTileId: null,
   winner: null,
   ponAvailable: null,
@@ -177,6 +180,7 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
           wallCount: 0,
           currentPlayer: 0 as PlayerId,
           turnCount: 0,
+          gameStartTime: 0,
           selectedTileId: null,
           winner: null,
           ponAvailable: null,
@@ -204,6 +208,7 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
       wallCount: 0,
       currentPlayer: 0 as PlayerId,
       turnCount: 0,
+      gameStartTime: 0,
       selectedTileId: null,
       winner: null,
       ponAvailable: null,
@@ -219,5 +224,5 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
 }))
 
 if (typeof window !== 'undefined') {
-  (window as any).__gameState = () => useMultiplayerStore.getState()
+  ;(window as Window & { __gameState?: () => unknown }).__gameState = () => useMultiplayerStore.getState()
 }
