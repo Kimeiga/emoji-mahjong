@@ -82,7 +82,7 @@ export type GameEventType =
   | 'pon-declined'
   | 'riichi-declared'
 
-export type GameEventListener = (event: GameEventType, data: any) => void
+export type GameEventListener = (event: GameEventType, data: unknown) => void
 
 const PLAYER_NAMES = ['You', 'East Bot', 'North Bot', 'West Bot']
 
@@ -130,7 +130,7 @@ export class GameRunner {
     }
   }
 
-  private emit(event: GameEventType, data?: any) {
+  private emit(event: GameEventType, data?: unknown) {
     for (const l of this.listeners) l(event, data)
   }
 

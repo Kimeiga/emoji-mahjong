@@ -6,7 +6,7 @@
  */
 
 import { GameRunner } from '../src/engine/game-runner'
-import type { GameRunnerState, GameSnapshot } from '../src/engine/game-runner'
+import type { GameRunnerState } from '../src/engine/game-runner'
 import { shouldAICallPon } from '../src/engine/ai'
 import type {
   AIDifficulty,
@@ -35,6 +35,10 @@ interface PersistedRoomState {
   gameStarted: boolean
   rematchVotes: PlayerId[]
   runnerState: GameRunnerState | null
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 export class GameRoom implements DurableObject {
@@ -312,8 +316,8 @@ export class GameRoom implements DurableObject {
 
     try {
       this.runner.discard(tileId)
-    } catch (e: any) {
-      this.send(ws, { type: 'error', message: e.message })
+    } catch (error) {
+      this.send(ws, { type: 'error', message: errorMessage(error) })
       return
     }
 
@@ -346,8 +350,8 @@ export class GameRoom implements DurableObject {
         emoji: ponTileEmoji,
         tag: ponTag,
       })
-    } catch (e: any) {
-      this.send(ws, { type: 'error', message: e.message })
+    } catch (error) {
+      this.send(ws, { type: 'error', message: errorMessage(error) })
       return
     }
 
@@ -391,8 +395,8 @@ export class GameRoom implements DurableObject {
         kind: 'riichi',
         playerName: this.lobbyPlayers[info.playerId]?.name ?? `Player ${info.playerId}`,
       })
-    } catch (e: any) {
-      this.send(ws, { type: 'error', message: e.message })
+    } catch (error) {
+      this.send(ws, { type: 'error', message: errorMessage(error) })
       return
     }
 
@@ -408,8 +412,8 @@ export class GameRoom implements DurableObject {
     if (state.currentPlayer !== info.playerId || state.phase !== 'draw') return
     try {
       this.runner.pickMarket(tileId)
-    } catch (e: any) {
-      this.send(ws, { type: 'error', message: e.message })
+    } catch (error) {
+      this.send(ws, { type: 'error', message: errorMessage(error) })
       return
     }
     this.broadcastGameState()
@@ -425,8 +429,8 @@ export class GameRoom implements DurableObject {
     if (state.currentPlayer !== info.playerId || state.phase !== 'draw') return
     try {
       this.runner.drawBlind()
-    } catch (e: any) {
-      this.send(ws, { type: 'error', message: e.message })
+    } catch (error) {
+      this.send(ws, { type: 'error', message: errorMessage(error) })
       return
     }
     this.broadcastGameState()
