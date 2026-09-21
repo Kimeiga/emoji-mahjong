@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useGameStore, gameRunner } from '../store/game-store'
 import { isWinningHand } from '../engine/sets'
+import { calculateAIMarketPick } from '../engine/ai'
 
 /** Drives AI turns automatically with visible delays. Only runs in local (single-player) mode. */
 export function useAutoPlay(mode: 'local' | 'multiplayer' = 'local') {
@@ -8,6 +9,7 @@ export function useAutoPlay(mode: 'local' | 'multiplayer' = 'local') {
   const currentPlayer = useGameStore((s) => s.currentPlayer)
   const ponAvailable = useGameStore((s) => s.ponAvailable)
   const drawCurrentPlayer = useGameStore((s) => s.drawCurrentPlayer)
+  const pickMarket = useGameStore((s) => s.pickMarket)
   const discardTile = useGameStore((s) => s.discardTile)
   const aiTurn = useGameStore((s) => s.aiTurn)
   const callPon = useGameStore((s) => s.callPon)
@@ -58,9 +60,18 @@ export function useAutoPlay(mode: 'local' | 'multiplayer' = 'local') {
     if (phase !== 'draw' && phase !== 'discard') return
 
     if (phase === 'draw') {
-      // AI draws after a short delay
+      // AI uses the same market-vs-blind decision as multiplayer.
       timerRef.current = setTimeout(() => {
-        drawCurrentPlayer()
+        const state = gameRunner.getState()
+        const hand = state.players[state.currentPlayer].hand
+        const pick = calculateAIMarketPick(
+          hand,
+          state.market,
+          gameRunner.aiDifficulty,
+          state.tagCounts,
+        )
+        if (pick) pickMarket(pick.id)
+        else drawCurrentPlayer()
       }, 600)
     } else if (phase === 'discard') {
       // AI discards after thinking
@@ -70,5 +81,5 @@ export function useAutoPlay(mode: 'local' | 'multiplayer' = 'local') {
     }
 
     return () => clearTimeout(timerRef.current)
-  }, [mode, phase, currentPlayer, ponAvailable, drawCurrentPlayer, discardTile, aiTurn, callPon, declinePon, humanRiichi])
+  }, [mode, phase, currentPlayer, ponAvailable, drawCurrentPlayer, pickMarket, discardTile, aiTurn, callPon, declinePon, humanRiichi])
 }
