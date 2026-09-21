@@ -11,7 +11,7 @@
 import type { Tile, Player, PlayerId, GamePhase } from '../types'
 import { HAND_SIZE, WIN_SIZE, MARKET_SIZE } from '../data/emojis'
 import { selectTilePool, drawTile as drawFromWall } from './deck'
-import { isWinningHand, sortByTag, canDeclareRiichi } from './sets'
+import { isWinningHand, canFormTriplets, sortByTag, canDeclareRiichi } from './sets'
 import { calculateAIDiscard, calculateAIMarketPick, shouldAIDeclareRiichi, calculateRiichiDiscard } from './ai'
 import type { AIDifficulty } from '../multiplayer/protocol'
 
@@ -176,6 +176,10 @@ export class GameRunner {
     return this.state
   }
 
+  restore(state: GameRunnerState): void {
+    this.state = structuredClone(state)
+  }
+
   status(): string {
     const s = this.state
     if (s.phase === 'idle') return 'Game not started. Call start() to begin.'
@@ -222,6 +226,22 @@ export class GameRunner {
     }
 
     return lines.join('\n')
+  }
+
+  private isWinningPlayer(playerId: PlayerId): boolean {
+    const player = this.state.players[playerId]
+    const melds = this.state.revealedSets.filter(rs => rs.playerId === playerId)
+    const usedTags = new Set<string>()
+
+    for (const meld of melds) {
+      if (usedTags.has(meld.tag)) return false
+      if (meld.tiles.length !== 3 || !meld.tiles.every(tile => tile.tags.includes(meld.tag))) return false
+      usedTags.add(meld.tag)
+    }
+
+    const neededTriplets = 4 - melds.length
+    if (neededTriplets < 0 || player.hand.length !== neededTriplets * 3) return false
+    return canFormTriplets(player.hand, neededTriplets, usedTags)
   }
 
   // ---- Actions ----
@@ -376,8 +396,8 @@ export class GameRunner {
 
     // Win check: hand + revealed sets = WIN_SIZE (12) tiles
     const myMelds = this.state.revealedSets.filter(rs => rs.playerId === pid)
-    const allTiles = [...hand, ...myMelds.flatMap(rs => rs.tiles)]
-    if (allTiles.length === WIN_SIZE && isWinningHand(allTiles)) {
+    const totalTiles = hand.length + myMelds.reduce((sum, rs) => sum + rs.tiles.length, 0)
+    if (totalTiles === WIN_SIZE && this.isWinningPlayer(pid)) {
       this.state.phase = 'win'
       this.state.winner = pid
       this.emit('win', { player: pid })
@@ -514,8 +534,7 @@ export class GameRunner {
     const meldTileCount = myMelds.reduce((sum, rs) => sum + rs.tiles.length, 0)
     const totalTiles = player.hand.length + meldTileCount
     if (totalTiles >= WIN_SIZE) {
-      const allTiles = [...player.hand, ...myMelds.flatMap(rs => rs.tiles)]
-      if (isWinningHand(allTiles)) {
+      if (this.isWinningPlayer(callerId)) {
         this.state.phase = 'win'
         this.state.winner = callerId
         this.state.ponAvailable = null
@@ -626,8 +645,8 @@ export class GameRunner {
       const hand = player.hand
 
       const aiMelds = this.state.revealedSets.filter(rs => rs.playerId === pid)
-      const aiAllTiles = [...hand, ...aiMelds.flatMap(rs => rs.tiles)]
-      if (aiAllTiles.length === WIN_SIZE && isWinningHand(aiAllTiles)) {
+      const aiTileCount = hand.length + aiMelds.reduce((sum, rs) => sum + rs.tiles.length, 0)
+      if (aiTileCount === WIN_SIZE && this.isWinningPlayer(pid)) {
         return this.discard(hand[0].id) // triggers win check
       }
 

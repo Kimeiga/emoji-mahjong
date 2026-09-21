@@ -36,7 +36,8 @@ export function ResultScreen() {
     const ponTileIds = new Set(ponSets.flatMap(s => s.tiles.map(t => t.id)))
     const handOnly = winnerPlayer.hand.filter(t => !ponTileIds.has(t.id))
     const remaining = 4 - ponSets.length
-    const handTriplets = remaining > 0 ? findDisplayTriplets(handOnly, remaining, tagCounts) : []
+    const lockedTags = new Set(ponSets.map(s => s.tag))
+    const handTriplets = remaining > 0 ? findDisplayTriplets(handOnly, remaining, tagCounts, lockedTags) : []
     return [...ponSets, ...handTriplets]
   }, [winnerPlayer, winner, tagCounts, revealedSets])
 

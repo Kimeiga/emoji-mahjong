@@ -73,6 +73,7 @@ export interface GameStateView {
   players: PlayerView[]
   market: TileData[]
   tagCounts: Record<string, number>
+  gameStartedAt: number
 }
 
 export type ServerMessage =

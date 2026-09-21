@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { GameState, Player, PlayerId, Tile } from '../types'
 import { GameRunner } from '../engine/game-runner'
 import { playGameStart, playDraw, playDiscard, playPon, playRiichi, playWin } from '../audio/sounds'
+import { useAppStore } from './app-store'
 
 const runner = new GameRunner()
 
@@ -73,6 +74,7 @@ export const useGameStore = create<Store>((set) => {
     gameStartTime: Date.now(),
 
     startGame: () => {
+      runner.aiDifficulty = useAppStore.getState().aiDifficulty
       runner.start()
       playGameStart()
       set({ ...stateFromRunner(), lastPonEvent: null, lastRiichiEvent: null, gameStartTime: Date.now() })

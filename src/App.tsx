@@ -85,6 +85,7 @@ function MultiplayerGame() {
   const lastRiichiEvent = useMultiplayerStore((s) => s.lastRiichiEvent)
   const market = useMultiplayerStore((s) => s.market)
   const tagCounts = useMultiplayerStore((s) => s.tagCounts)
+  const gameStartedAt = useMultiplayerStore((s) => s.gameStartedAt)
 
   const selectTile = useMultiplayerStore((s) => s.selectTile)
   const clearPonEvent = useMultiplayerStore((s) => s.clearPonEvent)
@@ -94,7 +95,7 @@ function MultiplayerGame() {
     mode: 'multiplayer',
     phase, players, wallCount, currentPlayer, turnCount,
     selectedTileId, winner, ponAvailable, revealedSets, market, tagCounts, myPlayerId,
-    lastDrawnTileId: null, gameStartTime: Date.now(),
+    lastDrawnTileId: null, gameStartTime: gameStartedAt || Date.now(),
     selectTile,
     discardTile: (id: string) => { if (ws) sendMessage(ws, { type: 'discard', tileId: id }) },
     callPon: () => { if (ws) sendMessage(ws, { type: 'call-pon' }) },
@@ -137,7 +138,7 @@ function App() {
       const gs = (window as any).__gameState?.()
       const appState = useAppStore.getState()
       const debug = {
-        version: 'v57',
+        version: 'v62',
         time: new Date().toISOString(),
         screen: appState.screen,
         myPlayerId: appState.myPlayerId,
@@ -184,7 +185,7 @@ function App() {
         debug
       </button>
       <div className="fixed bottom-1 right-2 text-[9px] text-slate-600/40 pointer-events-none z-0">
-        v61
+        v62
       </div>
     </>
   )

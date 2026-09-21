@@ -6,7 +6,7 @@
  */
 
 import { GameRunner } from '../src/engine/game-runner'
-import type { GameSnapshot } from '../src/engine/game-runner'
+import type { GameRunnerState } from '../src/engine/game-runner'
 import { shouldAICallPon, calculateAIMarketPick } from '../src/engine/ai'
 import type {
   AIDifficulty,
@@ -33,6 +33,7 @@ export class GameRoom implements DurableObject {
   private aiDifficulty: AIDifficulty = 'medium'
   private lobbyPlayers: LobbyPlayer[] = []
   private gameStarted = false
+  private gameStartedAt = 0
   private rematchVotes: Set<PlayerId> = new Set()
   private aiTimer: ReturnType<typeof setTimeout> | null = null
   private ctx: DurableObjectState
@@ -41,6 +42,47 @@ export class GameRoom implements DurableObject {
   constructor(ctx: DurableObjectState, env: Env) {
     this.ctx = ctx
     this.env = env
+
+    this.ctx.blockConcurrencyWhile(async () => {
+      const saved = await this.ctx.storage.get<{
+        roomCode: string
+        aiDifficulty: AIDifficulty
+        lobbyPlayers: LobbyPlayer[]
+        gameStarted: boolean
+        gameStartedAt: number
+        runnerState: GameRunnerState | null
+      }>('game-room-state')
+
+      if (!saved) return
+      this.roomCode = saved.roomCode
+      this.aiDifficulty = saved.aiDifficulty
+      this.lobbyPlayers = saved.lobbyPlayers.map(player => ({
+        ...player,
+        connected: false,
+      }))
+      this.gameStarted = saved.gameStarted
+      this.gameStartedAt = saved.gameStartedAt
+
+      if (saved.gameStarted && saved.runnerState) {
+        this.runner = new GameRunner({ aiDifficulty: saved.aiDifficulty })
+        this.runner.restore(saved.runnerState)
+      }
+    })
+  }
+
+  private persistState() {
+    const runnerState = this.runner
+      ? structuredClone(this.runner.getState())
+      : null
+
+    this.ctx.waitUntil(this.ctx.storage.put('game-room-state', {
+      roomCode: this.roomCode,
+      aiDifficulty: this.aiDifficulty,
+      lobbyPlayers: this.lobbyPlayers,
+      gameStarted: this.gameStarted,
+      gameStartedAt: this.gameStartedAt,
+      runnerState,
+    }))
   }
 
   private async updateRegistry() {
@@ -132,7 +174,7 @@ export class GameRoom implements DurableObject {
         this.handleCallPon(ws)
         break
       case 'decline-pon':
-        this.handleDeclinePon()
+        this.handleDeclinePon(ws)
         break
       case 'declare-riichi':
         this.handleDeclareRiichi(ws)
@@ -234,6 +276,7 @@ export class GameRoom implements DurableObject {
     const playerConfig = sortedPlayers.map(lp => ({ name: lp.name, isHuman: lp.isHuman }))
     this.runner.start(playerConfig)
     this.gameStarted = true
+    this.gameStartedAt = Date.now()
     this.updateRegistry()
 
     this.broadcastRoomState()
@@ -302,10 +345,16 @@ export class GameRoom implements DurableObject {
     this.scheduleAITurns()
   }
 
-  private handleDeclinePon() {
+  private handleDeclinePon(ws: WebSocket) {
     if (!this.runner || !this.gameStarted) return
+    const info = this.players.get(ws)
+    if (!info) return
     const state = this.runner.getState()
-    if (state.phase !== 'pon-available') return
+    if (state.phase !== 'pon-available' || !state.ponAvailable) return
+    if (state.ponAvailable.playerId !== info.playerId) {
+      this.send(ws, { type: 'error', message: 'This pon decision belongs to another player' })
+      return
+    }
 
     try {
       this.runner.declinePon()
@@ -387,6 +436,7 @@ export class GameRoom implements DurableObject {
       const playerConfig = sortedPlayers.map(lp => ({ name: lp.name, isHuman: lp.isHuman }))
       this.runner.start(playerConfig)
       this.gameStarted = true
+      this.gameStartedAt = Date.now()
 
       this.broadcast({ type: 'rematch-starting' })
       this.broadcastRoomState()
@@ -409,7 +459,9 @@ export class GameRoom implements DurableObject {
     if (!anyConnected && this.players.size === 0) {
       this.runner = null
       this.gameStarted = false
+      this.gameStartedAt = 0
       this.lobbyPlayers = []
+      this.persistState()
       this.removeFromRegistry()
     } else {
       this.updateRegistry()
@@ -446,11 +498,13 @@ export class GameRoom implements DurableObject {
       aiDifficulty: this.aiDifficulty,
     }
     this.broadcast(msg)
+    this.persistState()
   }
 
   private broadcastGameState() {
     if (!this.runner) return
 
+    this.persistState()
     for (const [ws, info] of this.players) {
       this.sendGameStateToPlayer(ws, info.playerId)
     }
@@ -471,6 +525,7 @@ export class GameRoom implements DurableObject {
       revealedSets: snapshot.revealedSets,
       market: snapshot.market,
       tagCounts: snapshot.tagCounts,
+      gameStartedAt: this.gameStartedAt,
       players: snapshot.players.map((p) => {
         // Use lobby player names/isHuman (runner names may not persist)
         const lp = this.lobbyPlayers.find(l => l.id === p.id)
