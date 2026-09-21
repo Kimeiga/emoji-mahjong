@@ -185,7 +185,7 @@ function App() {
         debug
       </button>
       <div className="fixed bottom-1 right-2 text-[9px] text-slate-600/40 pointer-events-none z-0">
-        v61
+        v62
       </div>
     </>
   )
