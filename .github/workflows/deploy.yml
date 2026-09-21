@@ -17,7 +17,8 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run build
+      - name: Quality gate
+        run: npm run check
 
       # Deploy Worker (serves API + WebSocket + static fallback)
       - name: Deploy Worker
