@@ -42,6 +42,47 @@ export class GameRoom implements DurableObject {
   constructor(ctx: DurableObjectState, env: Env) {
     this.ctx = ctx
     this.env = env
+
+    this.ctx.blockConcurrencyWhile(async () => {
+      const saved = await this.ctx.storage.get<{
+        roomCode: string
+        aiDifficulty: AIDifficulty
+        lobbyPlayers: LobbyPlayer[]
+        gameStarted: boolean
+        gameStartedAt: number
+        runnerState: GameSnapshot | null
+      }>('game-room-state')
+
+      if (!saved) return
+      this.roomCode = saved.roomCode
+      this.aiDifficulty = saved.aiDifficulty
+      this.lobbyPlayers = saved.lobbyPlayers.map(player => ({
+        ...player,
+        connected: false,
+      }))
+      this.gameStarted = saved.gameStarted
+      this.gameStartedAt = saved.gameStartedAt
+
+      if (saved.gameStarted && saved.runnerState) {
+        this.runner = new GameRunner({ aiDifficulty: saved.aiDifficulty })
+        this.runner.restore(saved.runnerState as unknown as import('../src/engine/game-runner').GameRunnerState)
+      }
+    })
+  }
+
+  private persistState() {
+    const runnerState = this.runner
+      ? structuredClone(this.runner.getState())
+      : null
+
+    this.ctx.waitUntil(this.ctx.storage.put('game-room-state', {
+      roomCode: this.roomCode,
+      aiDifficulty: this.aiDifficulty,
+      lobbyPlayers: this.lobbyPlayers,
+      gameStarted: this.gameStarted,
+      gameStartedAt: this.gameStartedAt,
+      runnerState,
+    }))
   }
 
   private async updateRegistry() {
@@ -456,11 +497,13 @@ export class GameRoom implements DurableObject {
       aiDifficulty: this.aiDifficulty,
     }
     this.broadcast(msg)
+    this.persistState()
   }
 
   private broadcastGameState() {
     if (!this.runner) return
 
+    this.persistState()
     for (const [ws, info] of this.players) {
       this.sendGameStateToPlayer(ws, info.playerId)
     }
