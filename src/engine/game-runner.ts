@@ -176,6 +176,10 @@ export class GameRunner {
     return this.state
   }
 
+  restore(state: GameRunnerState): void {
+    this.state = structuredClone(state)
+  }
+
   status(): string {
     const s = this.state
     if (s.phase === 'idle') return 'Game not started. Call start() to begin.'
