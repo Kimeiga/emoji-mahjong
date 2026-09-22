@@ -307,7 +307,7 @@ export function MenuScreen({ onLearn }: { onLearn: () => void }) {
   }
 
   return (
-    <div className="h-full flex flex-col items-center justify-center px-6 relative">
+    <div className="menu-screen flex flex-col items-center justify-center px-6 relative">
       <FloatingBackground />
       <motion.div
         initial={{ y: -30, opacity: 0 }}

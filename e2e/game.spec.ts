@@ -54,6 +54,7 @@ test('single player: hard difficulty, inspection, legal actions, result and repl
   expect(await page.evaluate(() => (window as Window & {__game: GameRunner}).__game.aiDifficulty)).toBe('hard')
   await page.locator('.hand-anchor [data-tile-id]').first().click()
   await expect(page.locator('.modal-above-hand')).toBeVisible()
+  await expect(page.locator('.modal-above-hand').getByRole('button', {name:'Close tile details', exact:true})).toBeInViewport()
   await page.locator('.modal-above-hand').getByRole('button', {name:'Close tile details', exact:true}).click()
   await expect(page.getByRole('region', {name:'Your connections'})).toBeVisible()
   await expect(page.getByRole('region', {name:'Your connections'})).toContainText('Only PON locks a set.')
@@ -79,6 +80,9 @@ test('single player: hard difficulty, inspection, legal actions, result and repl
       const pick = [...s.market].sort((a,b)=>b.tags.reduce((n,t)=>n+frequency(t),0)-a.tags.reduce((n,t)=>n+frequency(t),0))[0]
       if (pick) {
         await page.locator(`.market-anchor [data-tile-id="${pick.id}"]`).click()
+        await expect(page.locator('.modal-above-market').getByRole('button', {name:/^Pick /})).toBeInViewport()
+        await expect(page.locator('.modal-above-market').getByRole('button', {name:'Close tile details'})).toBeInViewport()
+        await expect(page.locator('.modal-above-hand')).toHaveCount(0)
         await page.locator('.modal-above-market').getByRole('button', {name:/^Pick /}).click()
       } else await page.getByRole('button', {name:'Draw blind from wall', exact:true}).click()
     } else if (s.currentPlayer === 0 && s.phase === 'discard') {
@@ -224,6 +228,8 @@ test('single-player shell reloads from its cache without an available origin', a
 test('learn replay and connection controls are keyboard accessible on a short screen', async ({ page }, testInfo) => {
   await page.setViewportSize({width:320,height:568})
   await skipTutorial(page)
+  await page.getByRole('heading', {name:'Emoji Mahjong',exact:true}).scrollIntoViewIfNeeded()
+  await expect(page.getByRole('heading', {name:'Emoji Mahjong',exact:true})).toBeInViewport()
   const learn = page.getByRole('button', {name:'Learn by playing',exact:true})
   await learn.focus(); await page.keyboard.press('Enter')
   await expect(page.getByRole('heading', {name:'Find the connection'})).toBeFocused()
@@ -237,5 +243,11 @@ test('learn replay and connection controls are keyboard accessible on a short sc
   await page.locator('.hand-anchor').scrollIntoViewIfNeeded()
   await expect(page.locator('.hand-anchor')).toBeInViewport()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy()
+  await page.locator('.market-anchor [data-tile-id]').first().click()
+  await expect(page.locator('.modal-above-market').getByRole('button', {name:/^Pick /})).toBeInViewport()
+  await expect(page.locator('.modal-above-market').getByRole('button', {name:'Close tile details'})).toBeInViewport()
+  await page.screenshot({path:testInfo.outputPath('short-screen-inspector.png'),fullPage:true})
+  await page.locator('.modal-above-market').getByRole('button', {name:'Close tile details'}).click()
+  await page.locator('#root').evaluate(element => element.scrollTop = 0)
   await page.screenshot({path:testInfo.outputPath('short-screen.png'),fullPage:true})
 })

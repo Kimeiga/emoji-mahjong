@@ -4,7 +4,7 @@ import type { RevealedSet, Tile } from '../../types'
 
 export function HandTakeaway({ hand, melds, tagCounts }: { hand: Tile[]; melds: RevealedSet[]; tagCounts: Record<string, number> }) {
   const analysis = useMemo(() => analyzeConnections(hand, melds), [hand, melds])
-  const waiting = useMemo(() => winningConnectionTags(hand, melds), [hand, melds])
+  const waiting = useMemo(() => winningConnectionTags(hand, melds).filter(tag => (tagCounts[tag] ?? 0) >= 3), [hand, melds, tagCounts])
   const pair = analysis.pairs.find(pair => (tagCounts[pair.tag] ?? 0) >= 3)
   return <section aria-label="Your final hand" className="takeaway-card text-left">
     <h2 className="text-sm font-semibold text-white">Your final hand: {analysis.complete}/4 sets</h2>

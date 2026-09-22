@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useGame } from '../../contexts/GameContext'
 import { TileView, TagPill } from '../shared/Tile'
@@ -42,7 +42,7 @@ function MarketInspector({
           <button
             onClick={onClose}
             aria-label="Close tile details"
-              className="w-11 h-11 shrink-0 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-slate-400 hover:text-white text-xs transition-colors"
+            className="w-11 h-11 shrink-0 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-slate-400 hover:text-white text-xs transition-colors"
           >✕</button>
         </div>
 
@@ -96,11 +96,10 @@ function MarketInspector({
 }
 
 export function MarketRow() {
-  const { market, phase, currentPlayer, myPlayerId, pickMarket, drawBlind, players, tagCounts, wallCount, revealedSets } = useGame()
-  const [inspecting, setInspecting] = useState<string | null>(null)
+  const { market, phase, currentPlayer, myPlayerId, pickMarket, drawBlind, players, tagCounts, wallCount, revealedSets, selectedTileId, selectTile } = useGame()
 
   const isMyDraw = currentPlayer === myPlayerId && phase === 'draw'
-  const inspectedTile = inspecting ? market.find(t => t.id === inspecting) : null
+  const inspectedTile = selectedTileId ? market.find(t => t.id === selectedTileId) : null
   const hand = players[myPlayerId].hand
 
   const melds = useMemo(() => revealedSets.filter(set => set.playerId === myPlayerId), [revealedSets, myPlayerId])
@@ -116,8 +115,8 @@ export function MarketRow() {
           hand={hand}
           melds={melds}
           tagCounts={tagCounts}
-          onPick={() => { setInspecting(null); pickMarket(inspectedTile.id) }}
-          onClose={() => setInspecting(null)}
+          onPick={() => { selectTile(null); pickMarket(inspectedTile.id) }}
+          onClose={() => selectTile(null)}
         />
       )}
 
@@ -134,8 +133,8 @@ export function MarketRow() {
               <TileView
                 tile={tile}
                 size="md"
-                selected={inspecting === tile.id}
-                onClick={isMyDraw ? () => setInspecting(inspecting === tile.id ? null : tile.id) : undefined}
+                selected={selectedTileId === tile.id}
+                onClick={isMyDraw ? () => selectTile(selectedTileId === tile.id ? null : tile.id) : undefined}
               />
             </div>
           ))}
@@ -147,7 +146,7 @@ export function MarketRow() {
               disabled={wallCount === 0}
               aria-label="Draw blind from wall"
               onClick={drawBlind}
-              className="w-10 h-10 rounded-lg bg-slate-700 border-2 border-dashed border-slate-500 flex items-center justify-center text-slate-400 hover:border-sky-400 hover:text-sky-400 transition-colors"
+              className="w-11 h-11 rounded-lg bg-slate-700 border-2 border-dashed border-slate-500 flex items-center justify-center text-slate-400 hover:border-sky-400 hover:text-sky-400 transition-colors"
               title={wallCount ? "Draw blind from wall" : "Wall empty: choose a market tile"}
             >
               <span className="text-lg">?</span>

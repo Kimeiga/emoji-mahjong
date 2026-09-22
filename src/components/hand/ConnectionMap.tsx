@@ -6,7 +6,7 @@ interface Props {
   analysis: Analysis
   tagCounts: Record<string, number>
   focusedTag: string | null
-  onFocus: (tag: string | null) => void
+  onFocus: (tag: string | null, explore?: boolean) => void
 }
 
 export function ConnectionMap({ analysis, tagCounts, focusedTag, onFocus }: Props) {
@@ -50,7 +50,7 @@ export function ConnectionMap({ analysis, tagCounts, focusedTag, onFocus }: Prop
         {analysis.options.length === 0 && <p className="text-sm text-slate-300">No pairs yet. Inspect a market tile to find a connection.</p>}
         {analysis.options.map(option => (
           <button type="button" key={option.tag} className="connection-option" aria-pressed={focusedTag === option.tag}
-            onClick={() => onFocus(focusedTag === option.tag ? null : option.tag)}>
+            onClick={() => onFocus(focusedTag === option.tag ? null : option.tag, true)}>
             <span className="flex justify-between gap-2"><strong>{option.tag}</strong><span>{option.tiles.slice(0, 5).map(tile => tile.emoji).join(' ')}{option.tiles.length > 5 ? ' …' : ''}</span></span>
             <span className="block text-xs text-slate-400 mt-0.5">
               {option.lockedTag ? 'Unavailable: this tag is already locked by PON.' : (tagCounts[option.tag] ?? 0) < 3 ? 'Fewer than three tiles in this game use this tag.' : option.overlaps.length

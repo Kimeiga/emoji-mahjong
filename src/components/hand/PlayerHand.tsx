@@ -62,6 +62,7 @@ export function PlayerHand() {
 
   const hand = players[myPlayerId].hand
   const [focusedTag, setFocusedTag] = useState<string | null>(null)
+  const [exploreFocus, setExploreFocus] = useState(false)
   const isRiichi = players[myPlayerId].riichi
   const isMyTurn = currentPlayer === myPlayerId && phase === 'discard'
 
@@ -154,7 +155,7 @@ export function PlayerHand() {
   }
 
   const analysis = useMemo(() => analyzeConnections(hand, myLockedSets), [hand, myLockedSets])
-  const focused = analysis.groups.find(group => group.tag === focusedTag) ?? analysis.options.find(option => option.tag === focusedTag)
+  const focused = exploreFocus ? analysis.options.find(option => option.tag === focusedTag) : analysis.groups.find(group => group.tag === focusedTag)
   const highlightedIds = selectedTile ? relatedTileIds : new Set(focused?.tiles.map(tile => tile.id) ?? [])
   const hasSelection = !!selectedTile || !!focused
 
@@ -186,7 +187,7 @@ export function PlayerHand() {
         )}
       </div>
 
-      <ConnectionMap analysis={analysis} tagCounts={tagCounts} focusedTag={focused ? focusedTag : null} onFocus={(tag) => { setFocusedTag(tag); selectTile(null) }} />
+      <ConnectionMap analysis={analysis} tagCounts={tagCounts} focusedTag={focused ? focusedTag : null} onFocus={(tag, explore = false) => { setFocusedTag(tag); setExploreFocus(explore); selectTile(null) }} />
       {canRiichi && !isRiichi && <p className="text-xs text-slate-400 text-center mb-2">Optional: lock your ready hand. Later non-winning draws are auto-discarded.</p>}
 
       {/* Tag inspector modal */}
