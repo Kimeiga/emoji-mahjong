@@ -1,210 +1,72 @@
-import { useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { useEffect, useRef, useState } from 'react'
+import { chooseLesson, initialLesson, lesson, nextLesson } from '../../engine/lesson'
+import type { Tile } from '../../types'
 
-interface TutorialOverlayProps {
-  onDone: () => void
+function LessonTiles({ tiles, onChoose }: { tiles: Tile[]; onChoose?: (id: string) => void }) {
+  return <div className="flex flex-wrap justify-center gap-2">
+    {tiles.map(tile => onChoose ? <button type="button" key={tile.id} className="lesson-tile" aria-label={`Choose ${tile.name}`} onClick={() => onChoose(tile.id)}>
+      <span aria-hidden="true">{tile.emoji}</span><span className="text-[11px] text-slate-300">{tile.name}</span>
+    </button> : <span key={tile.id} className="text-3xl p-1" role="img" aria-label={tile.name}>{tile.emoji}</span>)}
+  </div>
 }
-
-const slides = [
-  {
-    title: "Match 3 emoji sharing a tag",
-    content: (
-      <div className="flex flex-col items-center gap-4">
-        <div className="flex items-center gap-3">
-          <span className="text-5xl">🐱</span>
-          <span className="text-5xl">🐕</span>
-          <span className="text-5xl">🐰</span>
-        </div>
-        <div className="flex items-center gap-2 mt-2">
-          <div className="h-px w-8 bg-slate-500" />
-          <span className="px-3 py-1 rounded-full bg-amber-500 text-sm font-bold text-slate-900">
-            animal (12)
-          </span>
-          <div className="h-px w-8 bg-slate-500" />
-        </div>
-        <p className="text-slate-400 text-sm mt-2 text-center max-w-xs">
-          Tap any tile to see its tags. Find 3 tiles that share a tag to form a set!
-        </p>
-      </div>
-    ),
-  },
-  {
-    title: "Pick from the market",
-    content: (
-      <div className="flex flex-col items-center gap-4">
-        <div className="flex gap-2">
-          {["🌸", "🎲", "🐉", "🏯", "🦊"].map((e, i) => (
-            <div key={i} className="w-10 h-10 bg-slate-700 rounded-lg flex items-center justify-center text-xl border border-slate-600">
-              {e}
-            </div>
-          ))}
-          <div className="w-10 h-10 bg-slate-700 rounded-lg flex items-center justify-center text-lg border-2 border-dashed border-slate-500 text-slate-400">
-            ?
-          </div>
-        </div>
-        <p className="text-slate-400 text-sm mt-2 text-center max-w-xs">
-          Each turn, pick a face-up tile from the market (you can inspect first!) or draw blind from the wall.
-        </p>
-      </div>
-    ),
-  },
-  {
-    title: "Claim discards with PON!",
-    content: (
-      <div className="flex flex-col items-center gap-4">
-        <div className="flex items-end gap-3">
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-[10px] text-slate-400">Your hand</span>
-            <div className="flex gap-1">
-              <span className="text-3xl bg-slate-700 rounded-lg px-1.5 py-1">🐱</span>
-              <span className="text-3xl bg-slate-700 rounded-lg px-1.5 py-1">🐕</span>
-            </div>
-          </div>
-          <span className="text-xl text-slate-500 pb-1">+</span>
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-[10px] text-slate-400">Discarded</span>
-            <span className="text-3xl bg-amber-700/50 rounded-lg px-1.5 py-1 ring-2 ring-amber-400">🐰</span>
-          </div>
-        </div>
-        <span className="px-4 py-1.5 rounded-full bg-amber-500 text-sm font-bold text-slate-900 mt-1">
-          PON!
-        </span>
-        <p className="text-slate-400 text-sm text-center max-w-xs">
-          When an opponent discards a tile that completes your set, claim it!
-        </p>
-      </div>
-    ),
-  },
-  {
-    title: "Rare tags = more points",
-    content: (
-      <div className="flex flex-col items-center gap-4">
-        <div className="space-y-2 w-full max-w-xs">
-          <div className="flex items-center justify-between px-3 py-2 bg-slate-700 rounded-lg">
-            <span className="px-2 py-0.5 rounded-full bg-amber-500 text-xs font-bold text-slate-900">red (14)</span>
-            <span className="text-sm text-slate-400">6 pts</span>
-          </div>
-          <div className="flex items-center justify-between px-3 py-2 bg-slate-700 rounded-lg">
-            <span className="px-2 py-0.5 rounded-full bg-sky-500 text-xs font-bold text-white">sky (3)</span>
-            <span className="text-sm text-amber-400 font-bold">27 pts</span>
-          </div>
-        </div>
-        <p className="text-slate-400 text-sm mt-1 text-center max-w-xs">
-          Tags with fewer tiles in the pool score more. The number on each tag tells you how rare it is!
-        </p>
-      </div>
-    ),
-  },
-  {
-    title: "Form 4 different-tag sets to win!",
-    content: (
-      <div className="flex flex-col items-center gap-4">
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            { tag: "animal", emoji: ["🐱", "🐕", "🐰"], pts: "7" },
-            { tag: "fruit", emoji: ["🍎", "🍊", "🍋"], pts: "10" },
-            { tag: "sport", emoji: ["⚽", "🏀", "🎾"], pts: "13" },
-            { tag: "rare", emoji: ["🦄", "🐉", "🦅"], pts: "27" },
-          ].map((g, i) => (
-            <div key={i} className="flex flex-col items-center">
-              <span className="text-[10px] text-amber-400 font-bold mb-0.5">{g.pts}pt</span>
-              <div className="flex gap-0.5 bg-slate-700 rounded-lg px-2 py-1.5">
-                {g.emoji.map((e, j) => <span key={j} className="text-xl">{e}</span>)}
-              </div>
-            </div>
-          ))}
-        </div>
-        <p className="text-slate-400 text-sm mt-1 text-center max-w-xs font-medium">
-          Each set must use a different tag. First to complete all 4 wins; rare tags raise your score.
-        </p>
-      </div>
-    ),
-  },
-]
-
-export default function TutorialOverlay({ onDone }: TutorialOverlayProps) {
-  const [currentSlide, setCurrentSlide] = useState(0)
-  const [direction, setDirection] = useState(1)
-
-  const isLast = currentSlide === slides.length - 1
-
-  function handleNext() {
-    if (isLast) {
-      (() => { try { localStorage.setItem("emoji-mahjong-tutorial-seen", "1") } catch { /* storage disabled */ } })()
-      onDone()
-    } else {
-      setDirection(1)
-      setCurrentSlide((s) => s + 1)
-    }
+export default function TutorialOverlay({ onDone }: { onDone: (play?: boolean) => void }) {
+  const [state, setState] = useState(initialLesson)
+  const heading = useRef<HTMLHeadingElement>(null)
+  const nextButton = useRef<HTMLButtonElement>(null)
+  useEffect(() => { if (state.solved) nextButton.current?.focus(); else heading.current?.focus() }, [state.step, state.solved])
+  const titles = ['Find the connection', 'Same tiles. Another meaning.', 'Keep a plan. Discard one.', 'Make the winning connection']
+  function finish(play = false) {
+    try { localStorage.setItem('emoji-mahjong-tutorial-seen', '1') } catch { /* Optional preference. */ }
+    onDone(play)
   }
-
-  function handleSkip() {
-    (() => { try { localStorage.setItem("emoji-mahjong-tutorial-seen", "1") } catch { /* storage disabled */ } })()
-    onDone()
-  }
-
-  const variants = {
-    enter: (dir: number) => ({ x: dir > 0 ? 200 : -200, opacity: 0 }),
-    center: { x: 0, opacity: 1 },
-    exit: (dir: number) => ({ x: dir > 0 ? -200 : 200, opacity: 0 }),
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/95">
-      <motion.div
-        className="relative z-10 bg-slate-800 rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4 border border-slate-700"
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: "spring", duration: 0.4 }}
-      >
-        {/* Slide content */}
-        <AnimatePresence mode="wait" custom={direction}>
-          <motion.div
-            key={currentSlide}
-            custom={direction}
-            variants={variants}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={{ duration: 0.2 }}
-          >
-            <h2 className="text-lg font-bold text-white text-center mb-5">
-              {slides[currentSlide].title}
-            </h2>
-            <div className="min-h-[180px] flex items-center justify-center">
-              {slides[currentSlide].content}
-            </div>
-          </motion.div>
-        </AnimatePresence>
-
-        {/* Dot indicators */}
-        <div className="flex justify-center gap-2 mt-5">
-          {slides.map((_, i) => (
-            <div
-              key={i}
-              className={`w-2 h-2 rounded-full transition-colors ${
-                i === currentSlide ? "bg-amber-400" : "bg-slate-600"
-              }`}
-            />
-          ))}
+  const choose = (id: string) => setState(previous => chooseLesson(previous, id))
+  return <main className="lesson-page">
+    <div className="lesson-shell">
+      <header className="flex justify-between items-center gap-3 mb-6">
+        <span className="text-xs font-semibold tracking-widest text-sky-300 uppercase">Learn by playing</span>
+        <button type="button" className="connection-link" onClick={() => finish()}>Skip</button>
+      </header>
+      <p className="text-xs text-slate-400 mb-2">{state.step + 1} of 4 · Practice, no timer</p>
+      <h1 ref={heading} tabIndex={-1} className="text-2xl font-bold text-white mb-3">{titles[state.step]}</h1>
+      <div className="flex gap-1 mb-6" aria-label={`Step ${state.step + 1} of 4`}>
+        {titles.map((title, i) => <span key={title} className={`h-1 flex-1 rounded-full ${i <= state.step ? 'bg-sky-400' : 'bg-slate-700'}`} />)}
+      </div>
+      {state.step === 0 && <>
+        <p className="lesson-copy">Three different emoji sharing one tag make a set. Pick a fruit from the market to join your pair.</p>
+        <div className="lesson-group"><span className="connection-tag">fruit · {state.solved ? '3' : '2'}/3</span><LessonTiles tiles={state.solved ? lesson.fruit : lesson.fruit.slice(0, 2)} /></div>
+        {!state.solved && <><p className="lesson-label">Practice market · pick one</p><LessonTiles tiles={lesson.firstMarket} onChoose={choose} /></>}
+      </>}
+      {state.step === 1 && <>
+        <p className="lesson-copy">Each set must use a different tag. Your first set uses <strong>fruit</strong>. Which other connection lets these three count too?</p>
+        <div className="lesson-group"><span className="connection-tag">First set: fruit</span><LessonTiles tiles={lesson.fruit} /></div>
+        <div className="lesson-group"><span className="lesson-label">Your next set</span><LessonTiles tiles={lesson.sweet} /></div>
+        <div className="grid grid-cols-2 gap-3">
+          {['fruit', 'sweet'].map(tag => <button type="button" key={tag} className="lesson-choice" disabled={state.solved} onClick={() => choose(tag)}>{tag}</button>)}
         </div>
-
-        {/* Buttons */}
-        <div className="flex gap-3 mt-5">
-          <button
-            onClick={handleSkip}
-            className="flex-1 py-2.5 rounded-lg bg-slate-700 text-slate-400 font-medium text-sm hover:bg-slate-600 transition-colors"
-          >
-            Skip
-          </button>
-          <button
-            onClick={handleNext}
-            className="flex-1 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold text-sm transition-colors"
-          >
-            {isLast ? "Play!" : "Next"}
-          </button>
+      </>}
+      {state.step === 2 && <>
+        <p className="lesson-copy">After picking a tile, discard one unless you have won. Keep these three sets and the vehicle pair. For this practice turn, discard the cactus.</p>
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          {(['fruit', 'sweet', 'sport', 'vehicle'] as const).map(tag => <div key={tag} className="lesson-group !m-0"><span className="connection-tag">{tag}</span><LessonTiles tiles={tag === 'vehicle' ? lesson.vehicle.slice(0, 2) : lesson[tag]} /></div>)}
         </div>
-      </motion.div>
+        {!state.solved && <LessonTiles tiles={[lesson.fruit[0], lesson.spare, lesson.vehicle[0]]} onChoose={choose} />}
+      </>}
+      {state.step === 3 && <>
+        <p className="lesson-copy">You have three sets and a vehicle pair. Pick the tile that completes all four sets.</p>
+        <div className="lesson-group"><span className="connection-tag">vehicle · {state.solved ? '3' : '2'}/3</span><LessonTiles tiles={state.solved ? lesson.vehicle : lesson.vehicle.slice(0, 2)} /></div>
+        {!state.solved && <><p className="lesson-label">Practice market · pick one</p><LessonTiles tiles={lesson.finalMarket} onChoose={choose} /></>}
+        {state.solved && <div className="grid grid-cols-2 gap-2 mt-3">
+          {(['fruit', 'sweet', 'sport', 'vehicle'] as const).map(tag => <div key={tag} className="lesson-group !m-0"><span className="connection-tag">{tag}</span><LessonTiles tiles={lesson[tag]} /></div>)}
+        </div>}
+      </>}
+      <p role="status" className={`lesson-feedback ${state.solved ? 'text-emerald-300' : 'text-slate-300'}`}>{state.feedback}</p>
+      {state.step < 3 ? <button ref={nextButton} type="button" className="lesson-primary" disabled={!state.solved} onClick={() => setState(nextLesson)}>Next</button> :
+        <button ref={nextButton} type="button" className="lesson-primary" disabled={!state.solved} onClick={() => finish(true)}>Play!</button>}
+      <p className="text-xs text-slate-400 mt-3">First to four different-tag sets wins. Each tile counts once. Bonus hand value never changes the winner.</p>
+      <details className="mt-4 text-sm text-slate-300"><summary className="connection-link">What are PON and Riichi?</summary>
+        <p className="lesson-copy mt-2">PON claims another player’s discard with two of your tiles. That set and its tag become locked. Other sets in your hand stay flexible.</p>
+        <p className="lesson-copy mt-2">Riichi locks a closed hand one tile from winning. Choose a highlighted legal discard first; later non-winning draws are discarded automatically. It is optional.</p>
+      </details>
     </div>
-  )
+  </main>
 }

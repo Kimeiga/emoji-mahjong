@@ -84,7 +84,7 @@ function PonPrompt() {
             <div className="p-4">
               {/* Header */}
               <div className="text-center mb-3">
-                <div className="text-xs text-slate-400 mb-1">Claim this tile to complete a set!</div>
+                <div className="text-xs text-slate-400 mb-1">Claim this discard. These tiles and this tag will lock.</div>
                 <TagPill tag={ponAvailable.matchingTag} />
               </div>
 
@@ -135,7 +135,7 @@ function PonPrompt() {
                 }}
                 transition={{ duration: 1, repeat: Infinity }}
               >
-                PON!
+                Claim set (PON!)
               </motion.button>
 
               {/* Skip button */}

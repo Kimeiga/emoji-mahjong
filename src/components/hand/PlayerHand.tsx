@@ -8,8 +8,8 @@ import { CSS } from '@dnd-kit/utilities'
 import { useGame } from '../../contexts/GameContext'
 import { TileView, TagPill } from '../shared/Tile'
 import { canDeclareRiichi } from '../../engine/sets'
-import { findDisplayTriplets } from '../../engine/triplet-display'
-import { scoreSet } from '../../engine/scoring'
+import { analyzeConnections } from '../../engine/connections'
+import { ConnectionMap } from './ConnectionMap'
 import type { Tile } from '../../types'
 
 function SortableTile({ tile, selected, highlighted, dimmed, newlyDrawn, onClick }: {
@@ -37,40 +37,19 @@ function SortableTile({ tile, selected, highlighted, dimmed, newlyDrawn, onClick
   )
 }
 
-function LockedSetView({ tag, tiles, tagCounts, onTap }: { tag: string; tiles: Tile[]; tagCounts: Record<string, number>; onTap: (id: string) => void }) {
-  const pts = scoreSet(tag, tagCounts)
+function LockedSetView({ tag, tiles, highlighted, onTap }: { tag: string; tiles: Tile[]; highlighted: boolean; onTap: (id: string) => void }) {
   return (
     <div className="flex flex-col items-center opacity-90">
       <div className="mb-0.5 flex items-center gap-1">
         <TagPill tag={tag} />
-        <span className="text-[9px] text-amber-400 font-bold">{pts}pt</span>
         <span className="text-[8px] text-amber-400">🔒</span>
       </div>
       <div className="flex gap-0 bg-amber-900/20 rounded-xl px-0.5 py-1 border border-amber-500/40 relative">
         <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center text-[8px] text-white font-bold z-10">🔒</div>
         {tiles.map((tile) => (
-          <TileView key={tile.id} tile={tile} size="lg" onClick={() => onTap(tile.id)} />
+          <TileView key={tile.id} tile={tile} size="lg" highlighted={highlighted} onClick={() => onTap(tile.id)} />
         ))}
       </div>
-    </div>
-  )
-}
-
-function ProgressBar({ current, total }: { current: number; total: number }) {
-  const pct = (current / total) * 100
-  return (
-    <div className="flex items-center gap-2 mt-1.5 px-4">
-      <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${
-            current >= total ? 'bg-green-500' : current >= 3 ? 'bg-amber-400' : 'bg-sky-500'
-          }`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <span className={`text-[10px] font-bold ${current >= total ? 'text-green-400' : 'text-slate-400'}`}>
-        {current}/{total} sets
-      </span>
     </div>
   )
 }
@@ -82,6 +61,7 @@ export function PlayerHand() {
   } = useGame()
 
   const hand = players[myPlayerId].hand
+  const [focusedTag, setFocusedTag] = useState<string | null>(null)
   const isRiichi = players[myPlayerId].riichi
   const isMyTurn = currentPlayer === myPlayerId && phase === 'discard'
 
@@ -165,6 +145,7 @@ export function PlayerHand() {
   }, [hand, isMyTurn, isRiichi])
 
   const handleTap = (tileId: string) => {
+    setFocusedTag(null)
     if (selectedTileId === tileId) {
       selectTile(null)
     } else {
@@ -172,8 +153,11 @@ export function PlayerHand() {
     }
   }
 
-  const completeSets = useMemo(() => myLockedSets.length + findDisplayTriplets(hand, 4 - myLockedSets.length, tagCounts, new Set(myLockedSets.map(s => s.tag))).length, [hand, myLockedSets, tagCounts])
-  const hasSelection = !!selectedTile
+  const analysis = useMemo(() => analyzeConnections(hand, myLockedSets), [hand, myLockedSets])
+  const focused = analysis.groups.find(group => group.tag === focusedTag) ?? analysis.options.find(option => option.tag === focusedTag)
+  const highlightedIds = selectedTile ? relatedTileIds : new Set(focused?.tiles.map(tile => tile.id) ?? [])
+  const hasSelection = !!selectedTile || !!focused
+
 
   return (
     <div className="px-2 pb-3 pt-1">
@@ -181,7 +165,7 @@ export function PlayerHand() {
       <div className="h-7 flex items-center justify-center relative z-[106]">
         {isRiichi && (
           <div className="text-center text-xs text-red-400 font-bold tracking-widest">
-            RIICHI — hand locked
+            Riichi: hand locked
           </div>
         )}
         {canRiichi && !isRiichi && (
@@ -189,18 +173,21 @@ export function PlayerHand() {
             onClick={() => declareRiichi(myPlayerId)}
             className="px-4 py-1.5 rounded-lg bg-gradient-to-r from-red-600 to-red-500 text-white font-bold text-sm tracking-wider shadow-lg shadow-red-500/30 active:shadow-inner animate-pulse"
           >
-            RIICHI!
+            Lock ready hand (RIICHI!)
           </button>
         )}
         {isMyTurn && !isRiichi && !canRiichi && !selectedTile && (
           <div className="text-center text-xs text-yellow-400 animate-pulse">
-            Tap a tile to inspect
+            Choose one tile to discard
           </div>
         )}
         {!isMyTurn && currentPlayer === myPlayerId && phase === 'draw' && (
           <div className="text-center text-xs text-sky-400">Choose a market tile or draw blind</div>
         )}
       </div>
+
+      <ConnectionMap analysis={analysis} tagCounts={tagCounts} focusedTag={focused ? focusedTag : null} onFocus={(tag) => { setFocusedTag(tag); selectTile(null) }} />
+      {canRiichi && !isRiichi && <p className="text-xs text-slate-400 text-center mb-2">Optional: lock your ready hand. Later non-winning draws are auto-discarded.</p>}
 
       {/* Tag inspector modal */}
       {selectedTile && (
@@ -215,7 +202,8 @@ export function PlayerHand() {
             </div>
             <button
               onClick={() => selectTile(null)}
-              className="w-6 h-6 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-slate-400 hover:text-white text-xs transition-colors"
+              aria-label="Close tile details"
+              className="w-11 h-11 shrink-0 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-slate-400 hover:text-white text-xs transition-colors"
             >✕</button>
           </div>
 
@@ -244,12 +232,14 @@ export function PlayerHand() {
                     <span className="text-[10px] text-slate-500">+{relatedTiles.length - 5}</span>
                   )}
                 </div>
-                {relatedTiles.length >= 2 ? (
-                  <span className="text-[9px] text-green-400 font-bold bg-green-500/10 px-1.5 py-0.5 rounded-full">✓ SET! ({scoreSet(tag, tagCounts)}pt)</span>
+                {myLockedSets.some(set => set.tag === tag) ? (
+                  <span className="text-xs text-amber-300">Tag already locked by PON</span>
+                ) : relatedTiles.length >= 2 ? (
+                  <span className="text-[9px] text-green-400 font-bold bg-green-500/10 px-1.5 py-0.5 rounded-full">Possible set</span>
                 ) : (tagCounts[tag] || 0) < 3 ? (
                   <span className="text-[9px] text-slate-600">not enough in pool</span>
                 ) : (
-                  <span className="text-[9px] text-slate-500">need {2 - relatedTiles.length} more → {scoreSet(tag, tagCounts)}pt</span>
+                  <span className="text-[9px] text-slate-500">need {2 - relatedTiles.length} more</span>
                 )}
               </div>
             ))}
@@ -269,7 +259,7 @@ export function PlayerHand() {
       <div className="hand-anchor flex flex-wrap gap-1.5 justify-center max-w-md mx-auto items-end relative z-[102]">
         {/* Locked pon sets */}
         {myLockedSets.map((rs) => (
-          <LockedSetView key={rs.tag} tag={rs.tag} tiles={rs.tiles} tagCounts={tagCounts} onTap={handleTap} />
+          <LockedSetView key={rs.tag} tag={rs.tag} tiles={rs.tiles} highlighted={focusedTag === rs.tag} onTap={handleTap} />
         ))}
 
         {/* All unlocked tiles — sortable grid */}
@@ -282,8 +272,8 @@ export function PlayerHand() {
                     key={tile.id}
                     tile={tile}
                     selected={selectedTileId === tile.id}
-                    highlighted={hasSelection && relatedTileIds.has(tile.id)}
-                    dimmed={hasSelection && tile.id !== selectedTileId && !relatedTileIds.has(tile.id)}
+                    highlighted={hasSelection && highlightedIds.has(tile.id)}
+                    dimmed={hasSelection && tile.id !== selectedTileId && !highlightedIds.has(tile.id)}
                     newlyDrawn={tile.id === lastDrawnTileId}
                     onClick={() => handleTap(tile.id)}
                   />
@@ -294,8 +284,7 @@ export function PlayerHand() {
         )}
       </div>
 
-      {/* Progress bar */}
-      <ProgressBar current={completeSets} total={4} />
+      <p className="text-xs text-center text-slate-400 mt-2">Each tile counts once. Tap to inspect; drag to reorder.</p>
     </div>
   )
 }

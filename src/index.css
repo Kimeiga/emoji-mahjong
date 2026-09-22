@@ -52,3 +52,39 @@ html, body, #root {
 
 #root { min-height: 100dvh; padding-bottom: env(safe-area-inset-bottom); box-sizing: border-box; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; } }
+
+/* Connections-first play: previews explain the hand without moving or locking it. */
+button:focus-visible, summary:focus-visible { outline: 2px solid #7dd3fc; outline-offset: 3px; }
+button:disabled { cursor: not-allowed; }
+.game-screen { padding: 8px 0 max(14px, env(safe-area-inset-bottom)); }
+.turn-header { padding: 4px 12px; }
+.game-rules { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+.game-rules summary { cursor: pointer; width: fit-content; padding: 6px 0; }
+.game-rules p { margin: 5px 0; line-height: 1.6; color: #cbd5e1; }
+.connections-panel { background: #111e32; border: 1px solid #2a3e57; border-radius: 14px; padding: 10px; margin: 4px 0 12px; }
+.connection-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.connection-card { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; min-height: 58px; border: 1px solid #33465e; border-radius: 9px; background: #18293e; padding: 6px 9px; text-align: left; }
+.connection-card[aria-pressed="true"], .connection-option[aria-pressed="true"] { border-color: #7dd3fc; background: #153b50; }
+.connection-tag { font-size: 12px; font-weight: 600; color: #bae6fd; overflow-wrap: anywhere; }
+.connection-locked { border-color: #a68142; }
+.connection-locked .connection-tag { color: #fcd68a; }
+.connection-empty { border-style: dashed; background: transparent; color: #94a3b8; }
+.connection-link { min-height: 40px; color: #bae6fd; font-size: 12px; padding: 10px 2px; cursor: pointer; }
+.connection-link:hover { text-decoration: underline; }
+.connection-options { max-height: 190px; overflow-y: auto; border-top: 1px solid #334155; padding-top: 8px; }
+.connection-option { display: block; width: 100%; text-align: left; font-size: 13px; padding: 8px; border: 1px solid #334155; border-radius: 8px; margin-bottom: 5px; }
+.takeaway-card { width: 100%; max-width: 384px; background: #18293e; border: 1px solid #33465e; border-radius: 12px; padding: 14px; }
+.menu-connection-example { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 8px; padding: 14px; border: 1px solid #33465e; border-radius: 14px; background: #18293e; }
+.lesson-page { min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 20px 16px; }
+.lesson-shell { width: 100%; max-width: 420px; }
+.lesson-copy { font-size: 14px; line-height: 1.65; color: #cbd5e1; }
+.lesson-label { font-size: 12px; color: #94a3b8; display: block; text-align: center; margin-bottom: 8px; }
+.lesson-group { border: 1px solid #33465e; background: #18293e; border-radius: 12px; padding: 10px; text-align: center; margin: 16px 0; }
+.lesson-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-height: 86px; width: 92px; border: 1px solid #64748b; border-radius: 12px; background: #18293e; padding: 8px; font-size: 32px; }
+.lesson-tile:hover, .lesson-choice:hover { border-color: #7dd3fc; background: #20384f; }
+.lesson-choice { min-height: 48px; font-size: 16px; border: 1px solid #64748b; border-radius: 10px; background: #18293e; }
+.lesson-feedback { min-height: 65px; font-size: 14px; line-height: 1.6; margin-top: 18px; }
+.lesson-primary { width: 100%; padding: 14px; font-size: 16px; font-weight: 700; color: #0f172a; background: #fbbf24; border-radius: 12px; }
+.lesson-primary:disabled { opacity: .4; }
+/* Native scrolling is preferable to overlapping market, previews and controls. */
+@media (max-height: 700px) { .game-screen { min-height: 700px; } }

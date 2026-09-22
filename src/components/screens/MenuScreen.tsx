@@ -229,7 +229,7 @@ function FloatingBackground() {
   )
 }
 
-export function MenuScreen() {
+export function MenuScreen({ onLearn }: { onLearn: () => void }) {
   const setScreen = useAppStore((s) => s.setScreen)
 
   const setRoomCode = useAppStore((s) => s.setRoomCode)
@@ -329,7 +329,7 @@ export function MenuScreen() {
             Emoji Mahjong
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Match emoji by semantic tags
+            Find surprising connections. Race to four sets.
           </p>
           {stats.gamesPlayed > 0 && (
             <p className="text-[11px] text-slate-500 mt-2">
@@ -338,13 +338,20 @@ export function MenuScreen() {
           )}
         </div>
 
+        <div className="menu-connection-example" aria-label="Lemon, sunflower and star share yellow">
+          <span className="text-2xl" aria-hidden="true">🍋 · 🌻 · ⭐</span>
+          <span className="text-xs text-amber-300">Different emoji. One connection: yellow.</span>
+        </div>
+        <button type="button" onClick={onLearn} className="connection-link block mx-auto mb-4">Learn by playing</button>
+
         {/* AI Difficulty selector */}
         <div className="mb-6">
-          <div className="text-xs text-slate-500 text-center mb-2">AI Difficulty</div>
+          <div className="text-xs text-slate-400 text-center mb-2">Bot difficulty</div>
           <div className="flex gap-2 justify-center">
             {difficulties.map((d) => (
               <button
                 key={d.value}
+                aria-pressed={aiDifficulty === d.value}
                 onClick={() => setAiDifficulty(d.value)}
                 className={`
                   px-3 py-1.5 rounded-lg text-sm font-medium transition-all

@@ -125,16 +125,19 @@ function App() {
   )
 
   if (showTutorial) {
-    return <TutorialOverlay onDone={() => setShowTutorial(false)} />
+    return <TutorialOverlay onDone={(play) => {
+      setShowTutorial(false)
+      if (play) useAppStore.getState().setScreen('single-player')
+    }} />
   }
 
   const content = (() => {
     switch (screen) {
-      case 'menu': return <MenuScreen />
+      case 'menu': return <MenuScreen onLearn={() => setShowTutorial(true)} />
       case 'single-player': return <SinglePlayerGame />
       case 'lobby': return <LobbyScreen />
       case 'multiplayer-game': return <MultiplayerGame />
-      default: return <MenuScreen />
+      default: return <MenuScreen onLearn={() => setShowTutorial(true)} />
     }
   })()
 
@@ -145,7 +148,7 @@ function App() {
         ? { ...useGameStore.getState(), wallCount: useGameStore.getState().wall.length, myPlayerId: 0 }
         : useMultiplayerStore.getState()
       const debug = {
-        version: 'v63',
+        version: 'v64',
         time: new Date().toISOString(),
         screen: appState.screen,
         myPlayerId: appState.myPlayerId,
@@ -192,7 +195,7 @@ function App() {
         debug
       </button>
       <div className="fixed bottom-1 right-2 text-[9px] text-slate-600/40 pointer-events-none z-0">
-        v63
+        v64
       </div>
     </>
   )

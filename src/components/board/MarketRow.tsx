@@ -2,18 +2,21 @@ import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useGame } from '../../contexts/GameContext'
 import { TileView, TagPill } from '../shared/Tile'
-import { scoreSet } from '../../engine/scoring'
+import { analyzeConnections } from '../../engine/connections'
+import type { RevealedSet } from '../../types'
 import type { Tile } from '../../types'
 
 function MarketInspector({
-  tile, hand, tagCounts, onPick, onClose,
+  tile, hand, tagCounts, melds, onPick, onClose,
 }: {
   tile: Tile
   hand: Tile[]
+  melds: RevealedSet[]
   tagCounts: Record<string, number>
   onPick: () => void
   onClose: () => void
 }) {
+  const preview = useMemo(() => analyzeConnections([...hand, tile], melds), [hand, tile, melds])
   // Find which tags this tile shares with tiles in the player's hand
   const tagRelations = useMemo(() => {
     const relations: { tag: string; relatedTiles: Tile[] }[] = []
@@ -38,7 +41,8 @@ function MarketInspector({
           </div>
           <button
             onClick={onClose}
-            className="w-6 h-6 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-slate-400 hover:text-white text-xs transition-colors"
+            aria-label="Close tile details"
+              className="w-11 h-11 shrink-0 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-slate-400 hover:text-white text-xs transition-colors"
           >✕</button>
         </div>
 
@@ -49,6 +53,7 @@ function MarketInspector({
           Pick {tile.emoji}
         </button>
 
+        <p className="text-xs text-slate-300 mb-2">After this pick: {preview.complete}/4 non-overlapping sets. {preview.complete === 4 ? 'This completes your hand.' : 'Connections may need rearranging.'}</p>
         {/* Tag relations with player's hand */}
         <div className="space-y-1 max-h-32 overflow-y-auto">
           {tagRelations.slice(0, 8).map(({ tag, relatedTiles }) => (
@@ -62,12 +67,14 @@ function MarketInspector({
                   <span className="text-[10px] text-slate-500">+{relatedTiles.length - 5}</span>
                 )}
               </div>
-              {relatedTiles.length >= 2 ? (
-                <span className="text-[9px] text-green-400 font-bold bg-green-500/10 px-1.5 py-0.5 rounded-full">✓ SET! ({scoreSet(tag, tagCounts)}pt)</span>
+              {melds.some(set => set.tag === tag) ? (
+                <span className="text-xs text-amber-300">Tag already locked by PON</span>
+              ) : relatedTiles.length >= 2 ? (
+                <span className="text-[9px] text-green-400 font-bold bg-green-500/10 px-1.5 py-0.5 rounded-full">Possible set</span>
               ) : (tagCounts[tag] || 0) < 3 ? (
                 <span className="text-[9px] text-slate-600">not enough in pool</span>
               ) : (
-                <span className="text-[9px] text-slate-500">need {2 - relatedTiles.length} more → {scoreSet(tag, tagCounts)}pt</span>
+                <span className="text-[9px] text-slate-500">need {2 - relatedTiles.length} more</span>
               )}
             </div>
           ))}
@@ -89,12 +96,14 @@ function MarketInspector({
 }
 
 export function MarketRow() {
-  const { market, phase, currentPlayer, myPlayerId, pickMarket, drawBlind, players, tagCounts, wallCount } = useGame()
+  const { market, phase, currentPlayer, myPlayerId, pickMarket, drawBlind, players, tagCounts, wallCount, revealedSets } = useGame()
   const [inspecting, setInspecting] = useState<string | null>(null)
 
   const isMyDraw = currentPlayer === myPlayerId && phase === 'draw'
   const inspectedTile = inspecting ? market.find(t => t.id === inspecting) : null
   const hand = players[myPlayerId].hand
+
+  const melds = useMemo(() => revealedSets.filter(set => set.playerId === myPlayerId), [revealedSets, myPlayerId])
 
   if (market.length === 0) return null
 
@@ -105,6 +114,7 @@ export function MarketRow() {
         <MarketInspector
           tile={inspectedTile}
           hand={hand}
+          melds={melds}
           tagCounts={tagCounts}
           onPick={() => { setInspecting(null); pickMarket(inspectedTile.id) }}
           onClose={() => setInspecting(null)}
@@ -113,7 +123,7 @@ export function MarketRow() {
 
       <div className="market-anchor flex flex-col items-center py-2 px-2 relative z-[102]">
         <div className="text-[10px] text-slate-500 mb-1">
-          {isMyDraw ? 'Tap a tile to inspect, then pick' : 'Market'}
+          {isMyDraw ? 'Market · inspect a tile, then pick it' : 'Market'}
         </div>
         <div className="flex gap-1.5 items-center">
           {market.map((tile) => (
