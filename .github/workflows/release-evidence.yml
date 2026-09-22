@@ -1,0 +1,27 @@
+name: Release evidence
+
+on:
+  push:
+    branches: [fix/release-recovery-v63]
+
+permissions:
+  contents: read
+
+jobs:
+  snapshots:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Snapshot reviewed revisions
+        run: |
+          mkdir -p /tmp/emoji-sources
+          git archive --format=tar.gz --prefix=main/ ca17f0a2dbd8c594675e5b43ed0e0acd271058ad > /tmp/emoji-sources/main.tar.gz
+          git archive --format=tar.gz --prefix=pr1/ fe1dd25b9298e5af7b3c095f2fa71f58ba250ce8 > /tmp/emoji-sources/pr1.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: emoji-source-snapshots
+          path: /tmp/emoji-sources/
+          retention-days: 3
