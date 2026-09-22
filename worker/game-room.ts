@@ -529,8 +529,8 @@ export class GameRoom implements DurableObject {
     } else {
       this.lobbyPlayers = this.lobbyPlayers.filter(p => p.id !== info.playerId)
     }
-    if (!this.players.size) {
-      // Everyone deliberately left. Unlike network loss, there is no session to resume.
+    if (!this.lobbyPlayers.some(player => player.isHuman)) {
+      // Only deliberate exits remove human seats; disconnected humans can still resume.
       this.runner = null
       this.gameStarted = false
       this.gameStartedAt = 0
@@ -538,6 +538,11 @@ export class GameRoom implements DurableObject {
       this.seatTokens = {}
       this.expiresAt = 0
       this.rematchVotes.clear()
+      this.removeFromRegistry()
+    } else if (this.players.size === 0) {
+      // Preserve absent humans using the same expiry policy as a full network loss.
+      // scheduleAITurns below cancels pending timers while no clients are connected.
+      this.expiresAt = Date.now() + 30 * 60_000
       this.removeFromRegistry()
     } else this.updateRegistry()
     this.broadcastRoomState()
