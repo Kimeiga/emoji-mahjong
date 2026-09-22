@@ -25,6 +25,8 @@ export function TileView({ tile, size = 'md', selected, dimmed, highlighted, new
   return (
     <motion.button
       layoutId={layoutId}
+      aria-label={tile.name || tile.emoji}
+      data-tile-id={tile.id}
       onClick={onClick}
       className={`
         ${sizes[size]}

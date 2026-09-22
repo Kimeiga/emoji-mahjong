@@ -1,95 +1,119 @@
-/**
- * WebSocket connection manager with auto-reconnect.
- * Handles disconnects during gameplay by automatically reconnecting
- * and re-joining the room with the same player name.
- */
-
 import { connectToRoom, sendMessage, parseServerMessage } from './client'
-import { getSession, clearSession } from '../utils/session'
+import { getSession, saveSession } from '../utils/session'
 import { useAppStore } from '../store/app-store'
 import { useMultiplayerStore } from '../store/multiplayer-store'
 import type { ServerMessage } from './protocol'
 
-let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 let currentWs: WebSocket | null = null
-let reconnectAttempts = 0
-const MAX_RECONNECT_ATTEMPTS = 5
-const RECONNECT_DELAYS = [1000, 2000, 3000, 5000, 8000]
+let timer: ReturnType<typeof setTimeout> | undefined
+let handshakeTimer: ReturnType<typeof setTimeout> | undefined
+let generation = 0
+let removeNetworkListeners: (() => void) | undefined
+let retry: (() => void) | undefined
+const DELAYS = [1000, 2000, 3000, 5000, 8000]
 
-function getDelay(): number {
-  return RECONNECT_DELAYS[Math.min(reconnectAttempts, RECONNECT_DELAYS.length - 1)]
-}
-
-/**
- * Set up a managed WebSocket connection with auto-reconnect.
- * Call this once when joining a room.
- */
-export function setupConnection(
-  roomCode: string,
-  playerName: string,
-  onMessage: (msg: ServerMessage) => void
-) {
+/** A replaced socket must never clear a newer connection or rejoin an old room. */
+export function setupConnection(roomCode: string, playerName: string, onMessage: (msg: ServerMessage) => void) {
   cleanup()
-  reconnectAttempts = 0
-  connect(roomCode, playerName, onMessage)
-}
-
-function connect(
-  roomCode: string,
-  playerName: string,
-  onMessage: (msg: ServerMessage) => void
-) {
-  const ws = connectToRoom(roomCode)
-  currentWs = ws
-
-  ws.onopen = () => {
-    reconnectAttempts = 0
-    sendMessage(ws, { type: 'join', playerName })
-    useAppStore.getState().setWs(ws)
-    useMultiplayerStore.getState().setReconnecting(false)
+  const id = generation
+  let attempts = 0
+  let stopped = false
+  const session = getSession()
+  let resumeToken = session?.roomCode === roomCode ? session.resumeToken : undefined
+  const store = () => useMultiplayerStore.getState()
+  function fail(message: string) {
+    stopped = true
+    store().setReconnecting(false)
+    store().setConnectionError(message)
+    onMessage({ type: 'error', message })
   }
-
-  ws.onmessage = (event) => {
-    const msg = parseServerMessage(event.data)
-    if (!msg) return
-    onMessage(msg)
-  }
-
-  ws.onerror = () => {
-    // onerror is always followed by onclose
-  }
-
-  ws.onclose = () => {
-    currentWs = null
-    useAppStore.getState().setWs(null)
-
-    // Only auto-reconnect if we're in a game (not intentionally disconnected)
-    const { screen } = useAppStore.getState()
-    const session = getSession()
-    if ((screen === 'multiplayer-game' || screen === 'lobby') && session && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-      reconnectAttempts++
-      useMultiplayerStore.getState().setReconnecting(true)
-      console.log(`[connection] Reconnecting (attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) in ${getDelay()}ms...`)
-      reconnectTimer = setTimeout(() => {
-        connect(roomCode, playerName, onMessage)
-      }, getDelay())
-    } else if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-      console.log('[connection] Max reconnect attempts reached')
-      clearSession()
-      useMultiplayerStore.getState().setReconnecting(false)
+  function connect() {
+    if (id !== generation || stopped) return
+    clearTimeout(timer)
+    store().setReconnecting(true)
+    store().setConnectionError(null)
+    const ws = connectToRoom(roomCode)
+    currentWs = ws
+    const active = () => id === generation && currentWs === ws && !stopped
+    handshakeTimer = setTimeout(() => { if (active()) ws.close() }, 10_000)
+    ws.onopen = () => {
+      if (active()) sendMessage(ws, { type: 'join', playerName, resumeToken })
+    }
+    ws.onmessage = (event) => {
+      if (!active()) return
+      const msg = parseServerMessage(event.data)
+      if (!msg) return
+      if (msg.type === 'assigned') {
+        clearTimeout(handshakeTimer)
+        attempts = 0
+        resumeToken = msg.resumeToken ?? resumeToken
+        saveSession({ roomCode, playerName, myPlayerId: msg.playerId, resumeToken })
+        useAppStore.getState().setWs(ws)
+        store().setReconnecting(false)
+      }
+      if (msg.type === 'error' && msg.code) {
+        clearTimeout(handshakeTimer)
+        fail(msg.message)
+        ws.close()
+        return
+      }
+      onMessage(msg)
+    }
+    ws.onerror = () => { /* close handles network failures */ }
+    ws.onclose = (event) => {
+      if (id !== generation || currentWs !== ws) return
+      clearTimeout(handshakeTimer)
+      currentWs = null
+      useAppStore.getState().setWs(null)
+      if (stopped) return
+      if (event.code === 4001) {
+        fail('This game was opened in another tab. Close that tab before retrying.')
+        return
+      }
+      store().setReconnecting(true)
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return
+      if (attempts >= DELAYS.length) {
+        fail('Connection lost. Your game is saved. Retry when you are back online.')
+        return
+      }
+      timer = setTimeout(connect, DELAYS[attempts++])
     }
   }
+  retry = () => {
+    if (id !== generation) return
+    attempts = 0
+    stopped = false
+    clearTimeout(timer)
+    clearTimeout(handshakeTimer)
+    const previous = currentWs
+    currentWs = null
+    previous?.close()
+    useAppStore.getState().setWs(null)
+    connect()
+  }
+  if (typeof window !== 'undefined') {
+    const online = () => { if (!currentWs || currentWs.readyState !== WebSocket.OPEN) retry?.() }
+    const visible = () => { if (document.visibilityState === 'visible' && getSession()?.roomCode === roomCode) retry?.() }
+    window.addEventListener('online', online)
+    document.addEventListener('visibilitychange', visible)
+    removeNetworkListeners = () => { window.removeEventListener('online', online); document.removeEventListener('visibilitychange', visible) }
+  }
+  connect()
 }
 
-/** Clean up connection and timers. Call when intentionally leaving. */
+export function retryConnection() { retry?.() }
+
 export function cleanup() {
-  if (reconnectTimer) {
-    clearTimeout(reconnectTimer)
-    reconnectTimer = null
-  }
-  if (currentWs) {
-    reconnectAttempts = MAX_RECONNECT_ATTEMPTS // prevent auto-reconnect
-    currentWs.close()
-    currentWs = null
-  }
+  generation++
+  clearTimeout(timer)
+  clearTimeout(handshakeTimer)
+  removeNetworkListeners?.()
+  removeNetworkListeners = undefined
+  retry = undefined
+  const previous = currentWs
+  currentWs = null
+  previous?.close()
+  useAppStore.getState().setWs(null)
+  useMultiplayerStore.getState().setReconnecting(false)
+  useMultiplayerStore.getState().setConnectionError(null)
 }

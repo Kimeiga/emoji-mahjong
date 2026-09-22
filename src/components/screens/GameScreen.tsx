@@ -1,6 +1,8 @@
 import { useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGame } from '../../contexts/GameContext'
+import { retryConnection } from '../../multiplayer/connection'
+import { useAppStore } from '../../store/app-store'
 import { useMultiplayerStore } from '../../store/multiplayer-store'
 import { DiscardPool } from '../board/DiscardPool'
 import { DrawIndicator } from '../board/DrawIndicator'
@@ -161,10 +163,14 @@ function RiichiToast() {
 
 function ReconnectBanner() {
   const reconnecting = useMultiplayerStore((s) => s.reconnecting)
-  if (!reconnecting) return null
+  const error = useMultiplayerStore((s) => s.connectionError)
+  const disconnect = useAppStore((s) => s.disconnect)
+  if (!reconnecting && !error) return null
   return (
     <div className="fixed top-0 left-0 right-0 z-[300] bg-amber-500 text-slate-900 text-center text-xs font-bold py-1 animate-pulse">
-      Reconnecting...
+      <span role="status">{error || 'Reconnecting. Your game is saved.'}</span>
+      {error && <button onClick={retryConnection} className="ml-3 underline">Retry</button>}
+      <button onClick={disconnect} className="ml-3 underline">Back to menu</button>
     </div>
   )
 }

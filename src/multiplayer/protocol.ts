@@ -18,16 +18,17 @@ export interface RoomListEntry {
 // ── Client → Server ──
 
 export type ClientMessage =
-  | { type: 'join'; playerName: string }
+  | { type: 'join'; playerName: string; resumeToken?: string }
   | { type: 'set-ai-difficulty'; difficulty: AIDifficulty }
   | { type: 'start' }
   | { type: 'discard'; tileId: string }
   | { type: 'call-pon' }
-  | { type: 'decline-pon' }
+  | { type: 'decline-pon'; tileId?: string }
   | { type: 'declare-riichi' }
   | { type: 'pick-market'; tileId: string }
   | { type: 'draw-blind' }
   | { type: 'rematch' }
+  | { type: 'leave' }
 
 // ── Server → Client ──
 
@@ -74,6 +75,8 @@ export interface GameStateView {
   market: TileData[]
   tagCounts: Record<string, number>
   gameStartedAt: number
+  gameEndedAt?: number
+  legalDiscardIds?: string[]
 }
 
 export type ServerMessage =
@@ -83,7 +86,7 @@ export type ServerMessage =
   | { type: 'toast'; kind: 'riichi'; playerName: string }
   | { type: 'player-joined'; player: LobbyPlayer }
   | { type: 'player-left'; playerId: PlayerId }
-  | { type: 'error'; message: string }
-  | { type: 'assigned'; playerId: PlayerId }
+  | { type: 'error'; message: string; code?: string }
+  | { type: 'assigned'; playerId: PlayerId; resumeToken?: string }
   | { type: 'rematch-votes'; count: number; total: number }
   | { type: 'rematch-starting' }

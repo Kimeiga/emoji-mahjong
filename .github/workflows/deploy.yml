@@ -4,29 +4,46 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: emoji-mahjong-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-
       - run: npm ci
+      - name: Lint, build, Worker types, engine and runtime regressions
+        run: npm run check
+      - name: Install browser engines
+        run: npx playwright install --with-deps chromium webkit
+      - name: Desktop, Android-sized and iPhone-sized browser regressions
+        run: npm run test:browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-evidence-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
 
-      - run: npm run build
-
-      # Deploy Worker (serves API + WebSocket + static fallback)
       - name: Deploy Worker
         run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      # Deploy Pages (static frontend at emojimahjong.pages.dev)
       - name: Deploy Pages
         run: npx wrangler pages deploy dist --project-name emojimahjong --branch main --commit-dirty=true
         env:

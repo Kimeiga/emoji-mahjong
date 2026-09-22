@@ -18,6 +18,8 @@ interface MultiplayerState {
   tagCounts: Record<string, number>
   myPlayerId: PlayerId
   gameStartedAt: number
+  gameEndedAt: number
+  legalDiscardIds: string[] | undefined
 
   // Lobby state
   lobbyPlayers: LobbyPlayer[]
@@ -33,6 +35,8 @@ interface MultiplayerState {
   lastRiichiEvent: { playerName: string } | null
 
   // Connection
+  connectionError: string | null
+  setConnectionError: (message: string | null) => void
   reconnecting: boolean
   setReconnecting: (v: boolean) => void
 
@@ -92,6 +96,8 @@ function convertGameState(state: GameStateView): Partial<MultiplayerState> {
     winner: state.winner,
     myPlayerId: state.myPlayerId,
     gameStartedAt: state.gameStartedAt,
+    gameEndedAt: state.gameEndedAt ?? 0,
+    legalDiscardIds: state.legalDiscardIds,
     ponAvailable,
     revealedSets: state.revealedSets.map((rs) => ({
       playerId: rs.playerId,
@@ -117,6 +123,8 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
   tagCounts: {},
   myPlayerId: 0 as PlayerId,
   gameStartedAt: 0,
+      gameEndedAt: 0,
+      legalDiscardIds: undefined,
 
   lobbyPlayers: [],
   gameStarted: false,
@@ -124,6 +132,8 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
   aiDifficulty: 'medium',
 
   rematchVotes: null,
+  connectionError: null,
+  setConnectionError: (connectionError) => set({ connectionError }),
   reconnecting: false,
   setReconnecting: (v) => set({ reconnecting: v }),
 
@@ -168,7 +178,7 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
         }))
         break
       case 'error':
-        console.error('[multiplayer] Server error:', msg.message)
+        set({ connectionError: msg.message })
         break
       case 'rematch-votes':
         set({ rematchVotes: { count: msg.count, total: msg.total } })
@@ -187,6 +197,8 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
           market: [],
           tagCounts: {},
           gameStartedAt: 0,
+      gameEndedAt: 0,
+      legalDiscardIds: undefined,
           gameStarted: true,
           rematchVotes: null,
           lastPonEvent: null,
@@ -215,6 +227,8 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
       market: [],
       tagCounts: {},
       gameStartedAt: 0,
+      gameEndedAt: 0,
+      legalDiscardIds: undefined,
       lobbyPlayers: [],
       gameStarted: false,
       rematchVotes: null,
@@ -224,5 +238,5 @@ export const useMultiplayerStore = create<MultiplayerState>((set) => ({
 }))
 
 if (typeof window !== 'undefined') {
-  (window as any).__gameState = () => useMultiplayerStore.getState()
+  (window as Window & { __gameState?: () => MultiplayerState }).__gameState = () => useMultiplayerStore.getState()
 }

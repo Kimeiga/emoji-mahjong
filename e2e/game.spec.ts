@@ -1,0 +1,135 @@
+import { test, expect, devices, type Page } from '@playwright/test'
+import type { GameRunner } from '../src/engine/game-runner'
+import type { GameStateView } from '../src/multiplayer/protocol'
+
+async function skipTutorial(page: Page) {
+  await page.goto('/')
+  const skip = page.getByRole('button', { name: 'Skip', exact: true })
+  if (await skip.isVisible()) await skip.click()
+  await expect(page.getByRole('button', { name: 'Single Player', exact: true })).toBeVisible()
+}
+const localState = (page: Page) => page.evaluate(() => (window as Window & { __game: GameRunner }).__game.exportState())
+const multiplayerState = (page: Page) => page.evaluate(() => (window as Window & { __gameState: () => GameStateView & { gameStartedAt: number } }).__gameState())
+
+test('tutorial states the actual distinct-tag victory rule', async ({ page }) => {
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message))
+  await page.goto('/')
+  for (let i = 0; i < 4; i++) await page.getByRole('button', {name:'Next', exact:true}).click()
+  await expect(page.locator('body')).toContainText(/different tags|distinct tags/i)
+  await expect(page.locator('body')).not.toContainText('Highest score takes the crown')
+  await page.getByRole('button', {name:'Play!', exact:true}).click()
+  await expect(page.getByRole('button', {name:'Single Player', exact:true})).toBeVisible()
+  expect(errors).toEqual([])
+})
+
+test('single player: hard difficulty, inspection, legal actions, result and replay', async ({ page }, testInfo) => {
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message))
+  await skipTutorial(page)
+  await page.getByRole('button', {name:'Hard', exact:true}).click()
+  await page.getByRole('button', {name:'Single Player', exact:true}).click()
+  expect(await page.evaluate(() => (window as Window & {__game: GameRunner}).__game.aiDifficulty)).toBe('hard')
+  await page.locator('.hand-anchor [data-tile-id]').first().click()
+  await expect(page.locator('.modal-above-hand')).toBeVisible()
+  await page.locator('.modal-above-hand').getByRole('button', {name:'✕', exact:true}).click()
+  await page.screenshot({path: testInfo.outputPath('game-start.png'), fullPage:true})
+  for (let actions = 0; actions < 150; actions++) {
+    const s = await localState(page)
+    if (s.phase === 'win' || s.phase === 'draw-game') break
+    if (s.phase === 'pon-available' && s.ponAvailable?.playerId === 0) {
+      await page.getByRole('button', {name:/PON!/}).click()
+    } else if (s.currentPlayer === 0 && s.phase === 'draw') {
+      const frequency = (tag: string) => s.players[0].hand.filter(t=>t.tags.includes(tag)).length
+      const pick = [...s.market].sort((a,b)=>b.tags.reduce((n,t)=>n+frequency(t),0)-a.tags.reduce((n,t)=>n+frequency(t),0))[0]
+      if (pick) {
+        await page.locator(`.market-anchor [data-tile-id="${pick.id}"]`).click()
+        await page.locator('.modal-above-market').getByRole('button', {name:/^Pick /}).click()
+      } else await page.getByRole('button', {name:'Draw blind from wall', exact:true}).click()
+    } else if (s.currentPlayer === 0 && s.phase === 'discard') {
+      const hand = s.players[0].hand
+      const score = (tags: string[]) => tags.reduce((n,t)=>n+hand.filter(x=>x.tags.includes(t)).length,0)
+      const discard = [...hand].sort((a,b)=>score(a.tags)-score(b.tags))[0]
+      await page.locator(`.hand-anchor [data-tile-id="${discard.id}"]`).click()
+      await page.locator('.modal-above-hand').getByRole('button', {name:/^Discard /}).click()
+    } else {
+      await expect.poll(async()=>{
+        const next = await localState(page)
+        return next.phase === 'win' || next.phase === 'draw-game' || (next.phase === 'pon-available' ? next.ponAvailable?.playerId === 0 : next.currentPlayer === 0)
+      }, {timeout:30_000}).toBeTruthy()
+    }
+  }
+  await expect(page.getByRole('button', {name:'Play Again', exact:true})).toBeVisible()
+  await page.screenshot({path:testInfo.outputPath('result.png'),fullPage:true})
+  const ended = await localState(page)
+  expect(['win','draw-game']).toContain(ended.phase)
+  await page.getByRole('button', {name:'Play Again', exact:true}).click()
+  await expect(page.locator('.market-anchor')).toBeVisible()
+  expect((await localState(page)).gameStartTime).toBeGreaterThan(ended.gameStartTime)
+  expect(errors).toEqual([])
+})
+
+test('two players: private hands, full disconnect, reload and original seats', async ({ browser }, testInfo) => {
+  const device = devices[testInfo.project.name === 'iphone-webkit' ? 'iPhone 13' : testInfo.project.name === 'phone-chromium' ? 'Pixel 7' : 'Desktop Chrome']
+  const oneContext = await browser.newContext({...device, baseURL:'http://127.0.0.1:8787'})
+  const twoContext = await browser.newContext({...device, baseURL:'http://127.0.0.1:8787'})
+  const one = await oneContext.newPage(); const two = await twoContext.newPage()
+  const errors: string[] = []
+  one.on('pageerror', e=>errors.push(e.message)); two.on('pageerror', e=>errors.push(e.message))
+  try {
+    for (const context of [oneContext, twoContext]) {
+      await context.addInitScript(() => {
+        const sockets: WebSocket[] = []
+        const Native = window.WebSocket
+        window.WebSocket = new Proxy(Native, {construct(Target, args: [string, string[]?]) {
+          const socket = new Target(...args); sockets.push(socket); return socket
+        }})
+        ;(window as Window & {__closeTestSockets?:()=>void}).__closeTestSockets = () => sockets.forEach(s=>s.close())
+        localStorage.setItem('emoji-mahjong-tutorial-seen','1')
+      })
+    }
+    const host = `Host${testInfo.workerIndex}${Date.now().toString().slice(-6)}`
+    await skipTutorial(one)
+    await one.getByRole('textbox', {name:'Your name'}).fill(host)
+    await one.getByRole('button', {name:'Multiplayer',exact:true}).click()
+    await one.getByRole('button', {name:'Create New Room',exact:true}).click()
+    await expect(one.getByRole('heading', {name:'Game Lobby'})).toBeVisible()
+    await skipTutorial(two)
+    await two.getByRole('textbox', {name:'Your name'}).fill('Partner')
+    await two.getByRole('button', {name:'Multiplayer',exact:true}).click()
+    await two.getByRole('button').filter({hasText:host}).click()
+    await expect(two.getByRole('heading', {name:'Game Lobby'})).toBeVisible()
+    await one.getByRole('button', {name:'Start Game',exact:true}).click()
+    await expect(one.locator('.market-anchor')).toBeVisible()
+    await expect(two.locator('.hand-anchor')).toBeVisible()
+    const before = await multiplayerState(one)
+    expect(before.myPlayerId).toBe(0)
+    expect((await multiplayerState(two)).myPlayerId).toBe(1)
+    expect(before.players[1].hand.every(t=>t.emoji==='?')).toBeTruthy()
+    for (const [context, page] of [[oneContext,one],[twoContext,two]] as const) {
+      await context.setOffline(true)
+      await page.evaluate(()=>(window as Window & {__closeTestSockets?:()=>void}).__closeTestSockets?.())
+    }
+    await expect(one.getByRole('status')).toContainText('Reconnecting')
+    await oneContext.setOffline(false); await twoContext.setOffline(false)
+    await one.reload(); await two.reload()
+    await expect(one.locator('.hand-anchor')).toBeVisible()
+    await expect(two.locator('.hand-anchor')).toBeVisible()
+    const after = await multiplayerState(one)
+    expect(after.myPlayerId).toBe(0)
+    expect((await multiplayerState(two)).myPlayerId).toBe(1)
+    expect(after.gameStartedAt).toBe(before.gameStartedAt)
+    expect(after.players[0].hand.map(t=>t.id)).toEqual(before.players[0].hand.map(t=>t.id))
+    await one.screenshot({path:testInfo.outputPath('reconnected.png'),fullPage:true})
+    expect(errors).toEqual([])
+  } finally { await oneContext.close(); await twoContext.close() }
+})
+
+test('single-player shell reloads offline after the first successful load', async ({ page, context }) => {
+  await skipTutorial(page)
+  await page.evaluate(async()=>{await navigator.serviceWorker.ready})
+  await expect.poll(()=>page.evaluate(()=>!!navigator.serviceWorker.controller)).toBeTruthy()
+  await context.setOffline(true)
+  await page.reload()
+  await page.getByRole('button', {name:'Single Player',exact:true}).click()
+  await expect(page.locator('.hand-anchor [data-tile-id]')).toHaveCount(11)
+  await context.setOffline(false)
+})

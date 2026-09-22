@@ -19,7 +19,7 @@ interface AppStore {
   disconnect: () => void
 }
 
-export const useAppStore = create<AppStore>((set) => ({
+export const useAppStore = create<AppStore>((set, get) => ({
   screen: 'menu',
   roomCode: null,
   ws: null,
@@ -31,6 +31,8 @@ export const useAppStore = create<AppStore>((set) => ({
   setMyPlayerId: (id) => set({ myPlayerId: id }),
   setAiDifficulty: (d) => set({ aiDifficulty: d }),
   disconnect: () => {
+    const socket = get().ws
+    if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'leave' }))
     cleanupConnection()
     clearSession()
     set({ ws: null, roomCode: null, screen: 'menu' })

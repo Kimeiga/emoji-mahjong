@@ -17,6 +17,8 @@ export interface GameContextValue {
   myPlayerId: PlayerId
   lastDrawnTileId: string | null
   gameStartTime: number
+  gameEndTime?: number
+  legalDiscardIds?: string[]
 
   // Actions
   selectTile: (id: string | null) => void

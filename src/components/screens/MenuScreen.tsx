@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '../../store/app-store'
 import { useMultiplayerStore } from '../../store/multiplayer-store'
 import { getApiUrl } from '../../multiplayer/client'
-import { setupConnection } from '../../multiplayer/connection'
+import { setupConnection, cleanup } from '../../multiplayer/connection'
 import { getSession, saveSession, clearSession } from '../../utils/session'
 import { getStats } from '../../utils/stats'
 import type { AIDifficulty, RoomListEntry } from '../../multiplayer/protocol'
@@ -71,7 +71,7 @@ function ServerBrowser({ playerName, onBack }: { playerName: string; onBack: () 
     setupConnection(code, name, (msg) => {
       if (msg.type === 'assigned') {
         setMyPlayerId(msg.playerId)
-        saveSession({ roomCode: code, playerName: name, myPlayerId: msg.playerId })
+        saveSession({ roomCode: code, playerName: name, myPlayerId: msg.playerId, resumeToken: msg.resumeToken })
       }
       if (msg.type === 'error') {
         setJoining(null)
@@ -258,9 +258,9 @@ export function MenuScreen() {
       setMyPlayerId(session.myPlayerId)
 
       const timeout = setTimeout(() => {
-        clearSession()
+        cleanup()
         setReconnecting(false)
-      }, 5000)
+      }, 15000)
 
       setupConnection(session.roomCode, session.playerName, (msg) => {
         if (msg.type === 'error') {
@@ -269,7 +269,10 @@ export function MenuScreen() {
           setReconnecting(false)
           return
         }
-        if (msg.type === 'assigned') setMyPlayerId(msg.playerId)
+        if (msg.type === 'assigned') {
+          setMyPlayerId(msg.playerId)
+          saveSession({ roomCode: session.roomCode, playerName: session.playerName, myPlayerId: msg.playerId, resumeToken: msg.resumeToken })
+        }
         applyServerMessage(msg)
         if (msg.type === 'game-state') {
           clearTimeout(timeout)
@@ -282,6 +285,7 @@ export function MenuScreen() {
           setReconnecting(false)
         }
       })
+      return () => clearTimeout(timeout)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -377,6 +381,7 @@ export function MenuScreen() {
               type="text"
               value={playerName}
               onChange={(e) => setPlayerName(e.target.value)}
+              aria-label="Your name"
               placeholder="Your name"
               maxLength={16}
               className="flex-1 px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-white text-sm placeholder:text-slate-600 focus:outline-none focus:border-sky-500 transition-colors"

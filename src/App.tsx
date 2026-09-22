@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAppStore } from './store/app-store'
-import { useGameStore } from './store/game-store'
+import { useGameStore, gameRunner } from './store/game-store'
 import { useMultiplayerStore } from './store/multiplayer-store'
 import { useAutoPlay } from './hooks/useAutoPlay'
 import { sendMessage } from './multiplayer/client'
@@ -13,6 +13,7 @@ import TutorialOverlay from './components/screens/TutorialOverlay'
 import type { PlayerId } from './types'
 
 function SinglePlayerGame() {
+  const aiDifficulty = useAppStore((s) => s.aiDifficulty)
   const phase = useGameStore((s) => s.phase)
   const players = useGameStore((s) => s.players)
   const wall = useGameStore((s) => s.wall)
@@ -43,7 +44,7 @@ function SinglePlayerGame() {
   useAutoPlay('local')
 
   useEffect(() => {
-    startGame()
+    startGame(aiDifficulty)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -56,6 +57,8 @@ function SinglePlayerGame() {
     market, tagCounts,
     myPlayerId: 0 as PlayerId,
     lastDrawnTileId, gameStartTime,
+    gameEndTime: useGameStore.getState().gameEndTime,
+    legalDiscardIds: gameRunner.getLegalDiscards(0),
     selectTile, discardTile, callPon, declinePon, declareRiichi,
     pickMarket, drawBlind,
     lastPonEvent, lastRiichiEvent, clearPonEvent, clearRiichiEvent,
@@ -95,11 +98,13 @@ function MultiplayerGame() {
     mode: 'multiplayer',
     phase, players, wallCount, currentPlayer, turnCount,
     selectedTileId, winner, ponAvailable, revealedSets, market, tagCounts, myPlayerId,
-    lastDrawnTileId: null, gameStartTime: gameStartedAt || Date.now(),
+    lastDrawnTileId: null, gameStartTime: gameStartedAt,
+    gameEndTime: useMultiplayerStore.getState().gameEndedAt,
+    legalDiscardIds: useMultiplayerStore.getState().legalDiscardIds,
     selectTile,
     discardTile: (id: string) => { if (ws) sendMessage(ws, { type: 'discard', tileId: id }) },
     callPon: () => { if (ws) sendMessage(ws, { type: 'call-pon' }) },
-    declinePon: () => { if (ws) sendMessage(ws, { type: 'decline-pon' }) },
+    declinePon: () => { if (ws) sendMessage(ws, { type: 'decline-pon', tileId: ponAvailable?.tile.id }) },
     declareRiichi: () => { if (ws) sendMessage(ws, { type: 'declare-riichi' }) },
     pickMarket: (tileId: string) => { if (ws) sendMessage(ws, { type: 'pick-market', tileId }) },
     drawBlind: () => { if (ws) sendMessage(ws, { type: 'draw-blind' }) },
@@ -116,7 +121,7 @@ function MultiplayerGame() {
 function App() {
   const screen = useAppStore((s) => s.screen)
   const [showTutorial, setShowTutorial] = useState(
-    () => !localStorage.getItem('emoji-mahjong-tutorial-seen')
+    () => { try { return !localStorage.getItem('emoji-mahjong-tutorial-seen') } catch { return true } }
   )
 
   if (showTutorial) {
@@ -135,10 +140,12 @@ function App() {
 
   function copyDebug() {
     try {
-      const gs = (window as any).__gameState?.()
       const appState = useAppStore.getState()
+      const gs = appState.screen === 'single-player'
+        ? { ...useGameStore.getState(), wallCount: useGameStore.getState().wall.length, myPlayerId: 0 }
+        : useMultiplayerStore.getState()
       const debug = {
-        version: 'v62',
+        version: 'v63',
         time: new Date().toISOString(),
         screen: appState.screen,
         myPlayerId: appState.myPlayerId,
@@ -151,13 +158,13 @@ function App() {
           wallCount: gs.wallCount,
           marketLen: gs.market?.length,
           winner: gs.winner,
-          players: gs.players?.map((p: any) => ({
+          players: gs.players?.map((p) => ({
             id: p.id, name: p.name, isHuman: p.isHuman, riichi: p.riichi,
             handSize: p.hand?.length, discardCount: p.discards?.length,
           })),
-          revealedSets: gs.revealedSets?.map((rs: any) => ({
+          revealedSets: gs.revealedSets?.map((rs) => ({
             playerId: rs.playerId, tag: rs.tag,
-            tiles: rs.tiles?.map((t: any) => t.emoji).join(''),
+            tiles: rs.tiles?.map((t) => t.emoji).join(''),
           })),
           ponAvailable: gs.ponAvailable ? {
             playerId: gs.ponAvailable.playerId,
@@ -185,7 +192,7 @@ function App() {
         debug
       </button>
       <div className="fixed bottom-1 right-2 text-[9px] text-slate-600/40 pointer-events-none z-0">
-        v62
+        v63
       </div>
     </>
   )

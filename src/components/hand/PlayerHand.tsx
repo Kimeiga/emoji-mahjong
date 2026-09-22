@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor,
   useSensor, useSensors, type DragEndEvent,
@@ -8,6 +8,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { useGame } from '../../contexts/GameContext'
 import { TileView, TagPill } from '../shared/Tile'
 import { canDeclareRiichi } from '../../engine/sets'
+import { findDisplayTriplets } from '../../engine/triplet-display'
 import { scoreSet } from '../../engine/scoring'
 import type { Tile } from '../../types'
 
@@ -77,7 +78,7 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
 export function PlayerHand() {
   const {
     players, myPlayerId, selectedTileId, selectTile, discardTile,
-    phase, currentPlayer, revealedSets, declareRiichi, lastDrawnTileId, tagCounts,
+    phase, currentPlayer, revealedSets, declareRiichi, lastDrawnTileId, tagCounts, legalDiscardIds,
   } = useGame()
 
   const hand = players[myPlayerId].hand
@@ -109,16 +110,17 @@ export function PlayerHand() {
     [hand, lockedTileIds]
   )
 
-  // Ordered tiles for drag-to-reorder (synced with hand changes)
-  const [orderedTiles, setOrderedTiles] = useState(unlockedHand)
-  useEffect(() => {
-    const currentIds = new Set(unlockedHand.map(t => t.id))
-    const kept = orderedTiles.filter(t => currentIds.has(t.id))
-    const added = unlockedHand.filter(t => !kept.find(o => o.id === t.id))
-    if (added.length > 0 || kept.length !== orderedTiles.length) {
-      setOrderedTiles([...kept, ...added])
-    }
-  }, [unlockedHand])
+  // Keep only the user's drag preference as state. Derive the current tile list
+  // from the live hand so draws/discards do not require synchronizing state in an effect.
+  const [orderedTileIds, setOrderedTileIds] = useState<string[]>([])
+  const orderedTiles = useMemo(() => {
+    const byId = new Map(unlockedHand.map(tile => [tile.id, tile]))
+    const ordered = orderedTileIds
+      .map(id => byId.get(id))
+      .filter((tile): tile is Tile => tile !== undefined)
+    const orderedIds = new Set(ordered.map(tile => tile.id))
+    return [...ordered, ...unlockedHand.filter(tile => !orderedIds.has(tile.id))]
+  }, [unlockedHand, orderedTileIds])
 
   // dnd-kit sensors: require 8px movement to start drag (distinguishes from tap)
   const sensors = useSensors(
@@ -129,15 +131,13 @@ export function PlayerHand() {
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
     if (!over || active.id === over.id) return
-    setOrderedTiles(prev => {
-      const oldIdx = prev.findIndex(t => t.id === active.id)
-      const newIdx = prev.findIndex(t => t.id === over.id)
-      if (oldIdx === -1 || newIdx === -1) return prev
-      const next = [...prev]
-      const [moved] = next.splice(oldIdx, 1)
-      next.splice(newIdx, 0, moved)
-      return next
-    })
+    const next = orderedTiles.map(tile => tile.id)
+    const oldIdx = next.findIndex(id => id === active.id)
+    const newIdx = next.findIndex(id => id === over.id)
+    if (oldIdx === -1 || newIdx === -1) return
+    const [moved] = next.splice(oldIdx, 1)
+    next.splice(newIdx, 0, moved)
+    setOrderedTileIds(next)
   }
 
   const tagRelations = useMemo(() => {
@@ -172,6 +172,7 @@ export function PlayerHand() {
     }
   }
 
+  const completeSets = useMemo(() => myLockedSets.length + findDisplayTriplets(hand, 4 - myLockedSets.length, tagCounts, new Set(myLockedSets.map(s => s.tag))).length, [hand, myLockedSets, tagCounts])
   const hasSelection = !!selectedTile
 
   return (
@@ -197,7 +198,7 @@ export function PlayerHand() {
           </div>
         )}
         {!isMyTurn && currentPlayer === myPlayerId && phase === 'draw' && (
-          <div className="text-center text-xs text-sky-400">Drawing...</div>
+          <div className="text-center text-xs text-sky-400">Choose a market tile or draw blind</div>
         )}
       </div>
 
@@ -220,8 +221,9 @@ export function PlayerHand() {
 
           {isMyTurn && !isSelectedLocked && (
             <button
+              disabled={!!legalDiscardIds && !legalDiscardIds.includes(selectedTile.id)}
               onClick={() => discardTile(selectedTile.id)}
-              className="w-full mt-1 mb-2 py-2 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 font-bold text-sm hover:bg-red-500/30 active:bg-red-500/40 transition-colors"
+              className="w-full mt-1 mb-2 py-2 rounded-lg bg-red-500/20 border border-red-500/40 text-red-400 font-bold text-sm hover:bg-red-500/30 active:bg-red-500/40 disabled:opacity-30 transition-colors"
             >
               Discard {selectedTile.emoji}
             </button>
@@ -293,7 +295,7 @@ export function PlayerHand() {
       </div>
 
       {/* Progress bar */}
-      <ProgressBar current={myLockedSets.length} total={4} />
+      <ProgressBar current={completeSets} total={4} />
     </div>
   )
 }

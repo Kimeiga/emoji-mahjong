@@ -15,7 +15,7 @@ export class RoomRegistry implements DurableObject {
   private rooms: Map<string, RoomInfo> = new Map()
   private ctx: DurableObjectState
 
-  constructor(ctx: DurableObjectState, _env: unknown) {
+  constructor(ctx: DurableObjectState) {
     this.ctx = ctx
     // Load from storage on init
     this.ctx.blockConcurrencyWhile(async () => {

@@ -12,9 +12,9 @@ function defaultStats(): GameStats {
 }
 
 export function getStats(): GameStats {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return defaultStats();
   try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return defaultStats();
     const parsed = JSON.parse(raw);
     return {
       wins: typeof parsed.wins === "number" ? parsed.wins : 0,
@@ -34,5 +34,5 @@ export function recordResult(result: "win" | "loss" | "draw"): void {
   if (result === "win") stats.wins += 1;
   else if (result === "loss") stats.losses += 1;
   else stats.draws += 1;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(stats)); } catch { /* storage disabled */ }
 }

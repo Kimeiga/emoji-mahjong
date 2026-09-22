@@ -11,7 +11,7 @@
 import type { Tile, Player, PlayerId, GamePhase } from '../types'
 import { HAND_SIZE, WIN_SIZE, MARKET_SIZE } from '../data/emojis'
 import { selectTilePool, drawTile as drawFromWall } from './deck'
-import { isWinningHand, canFormTriplets, sortByTag, canDeclareRiichi } from './sets'
+import { isWinningHand, isWinningWithRevealedSets, sortByTag, canDeclareRiichi, getRiichiDiscards } from './sets'
 import { calculateAIDiscard, calculateAIMarketPick, shouldAIDeclareRiichi, calculateRiichiDiscard } from './ai'
 import type { AIDifficulty } from '../multiplayer/protocol'
 
@@ -19,6 +19,8 @@ export interface GameSnapshot {
   phase: GamePhase
   currentPlayer: PlayerId
   turnCount: number
+  gameStartTime: number
+  gameEndTime: number
   wallSize: number
   winner: PlayerId | null
   market: { id: string; emoji: string; name: string; tags: string[] }[]
@@ -56,9 +58,12 @@ export interface GameRunnerState {
   tagCounts: Record<string, number>
   currentPlayer: PlayerId
   turnCount: number
+  gameStartTime: number
+  gameEndTime: number
   selectedTileId: string | null
   winner: PlayerId | null
   ponAvailable: PonOpportunity | null
+  riichiDeclarationPlayerId: PlayerId | null
   /** Player who discarded the tile triggering pon check */
   ponDiscarderId: PlayerId | null
   /** Tiles claimed via pon, stored as revealed sets */
@@ -80,7 +85,7 @@ export type GameEventType =
   | 'pon-declined'
   | 'riichi-declared'
 
-export type GameEventListener = (event: GameEventType, data: any) => void
+export type GameEventListener = (event: GameEventType, data: unknown) => void
 
 const PLAYER_NAMES = ['You', 'East Bot', 'North Bot', 'West Bot']
 
@@ -111,6 +116,9 @@ export class GameRunner {
       tagCounts: {},
       currentPlayer: 0,
       turnCount: 0,
+      gameStartTime: 0,
+      gameEndTime: 0,
+      riichiDeclarationPlayerId: null,
       selectedTileId: null,
       winner: null,
       ponAvailable: null,
@@ -127,7 +135,7 @@ export class GameRunner {
     }
   }
 
-  private emit(event: GameEventType, data?: any) {
+  private emit(event: GameEventType, data?: unknown) {
     for (const l of this.listeners) l(event, data)
   }
 
@@ -143,11 +151,13 @@ export class GameRunner {
       phase: s.phase,
       currentPlayer: s.currentPlayer,
       turnCount: s.turnCount,
+      gameStartTime: s.gameStartTime,
+      gameEndTime: s.gameEndTime,
       wallSize: s.wall.length,
       winner: s.winner,
       market: s.market.map(t => ({ id: t.id, emoji: t.emoji, name: t.name, tags: [...t.tags] })),
       tagCounts: { ...s.tagCounts },
-      ponAvailable: s.ponAvailable ? {
+      ponAvailable: s.ponAvailable && (forPlayer === undefined || forPlayer === s.ponAvailable.playerId) ? {
         playerId: s.ponAvailable.playerId,
         tile: { id: s.ponAvailable.tile.id, emoji: s.ponAvailable.tile.emoji, name: s.ponAvailable.tile.name, tags: [...s.ponAvailable.tile.tags] },
         matchingTag: s.ponAvailable.matchingTag,
@@ -164,7 +174,7 @@ export class GameRunner {
         isHuman: p.isHuman,
         riichi: p.riichi,
         handSize: p.hand.length,
-        hand: (p.isHuman || reveal || gameOver || p.id === forPlayer)
+        hand: (gameOver || p.id === forPlayer || (forPlayer === undefined && (p.isHuman || reveal)))
           ? p.hand.map((t) => ({ id: t.id, emoji: t.emoji, name: t.name, tags: [...t.tags] }))
           : [],
         discards: p.discards.map((t) => ({ id: t.id, emoji: t.emoji, name: t.name, tags: [...t.tags] })),
@@ -176,8 +186,12 @@ export class GameRunner {
     return this.state
   }
 
-  restore(state: GameRunnerState): void {
-    this.state = structuredClone(state)
+  exportState(): GameRunnerState {
+    return structuredClone(this.state)
+  }
+
+  restoreState(state: GameRunnerState): void {
+    this.state = { ...this.initialState(), ...structuredClone(state) }
   }
 
   status(): string {
@@ -228,22 +242,6 @@ export class GameRunner {
     return lines.join('\n')
   }
 
-  private isWinningPlayer(playerId: PlayerId): boolean {
-    const player = this.state.players[playerId]
-    const melds = this.state.revealedSets.filter(rs => rs.playerId === playerId)
-    const usedTags = new Set<string>()
-
-    for (const meld of melds) {
-      if (usedTags.has(meld.tag)) return false
-      if (meld.tiles.length !== 3 || !meld.tiles.every(tile => tile.tags.includes(meld.tag))) return false
-      usedTags.add(meld.tag)
-    }
-
-    const neededTriplets = 4 - melds.length
-    if (neededTriplets < 0 || player.hand.length !== neededTriplets * 3) return false
-    return canFormTriplets(player.hand, neededTriplets, usedTags)
-  }
-
   // ---- Actions ----
 
   start(playerConfig?: { name: string; isHuman: boolean }[]): GameSnapshot {
@@ -292,6 +290,9 @@ export class GameRunner {
       tagCounts,
       currentPlayer: 0,
       turnCount: 1,
+      gameStartTime: Date.now(),
+      gameEndTime: 0,
+      riichiDeclarationPlayerId: null,
       selectedTileId: null,
       winner: null,
       ponAvailable: null,
@@ -315,6 +316,7 @@ export class GameRunner {
       // Wall empty — check if market is empty too
       if (this.state.market.length === 0) {
         this.state.phase = 'draw-game'
+        this.state.gameEndTime = Date.now()
         this.emit('draw-game')
         this.emit('state-changed', this.snapshot())
         return this.snapshot()
@@ -330,6 +332,7 @@ export class GameRunner {
     this.state.lastDrawnTileId = result.tile.id
     this.state.phase = 'discard'
 
+    this.finishIfWinning(pid)
     this.emit('tile-drawn', { player: pid, tile: result.tile, source: 'wall' })
     this.emit('state-changed', this.snapshot())
     return this.snapshot()
@@ -358,6 +361,7 @@ export class GameRunner {
 
     this.refillMarket()
 
+    this.finishIfWinning(pid)
     this.emit('tile-drawn', { player: pid, tile, source: 'market' })
     this.emit('state-changed', this.snapshot())
     return this.snapshot()
@@ -384,7 +388,7 @@ export class GameRunner {
     let tileIndex: number
     if (typeof tileIdOrIndex === 'number') {
       tileIndex = tileIdOrIndex
-      if (tileIndex < 0 || tileIndex >= hand.length) {
+      if (!Number.isInteger(tileIndex) || tileIndex < 0 || tileIndex >= hand.length) {
         throw new Error(`Invalid index ${tileIndex}. Hand has ${hand.length} tiles.`)
       }
     } else {
@@ -394,17 +398,21 @@ export class GameRunner {
       }
     }
 
-    // Win check: hand + revealed sets = WIN_SIZE (12) tiles
+    // Win check: revealed melds remain locked to the tags they were claimed with.
     const myMelds = this.state.revealedSets.filter(rs => rs.playerId === pid)
-    const totalTiles = hand.length + myMelds.reduce((sum, rs) => sum + rs.tiles.length, 0)
-    if (totalTiles === WIN_SIZE && this.isWinningPlayer(pid)) {
+    if (isWinningWithRevealedSets(hand, myMelds)) {
       this.state.phase = 'win'
+      this.state.gameEndTime = Date.now()
       this.state.winner = pid
       this.emit('win', { player: pid })
       this.emit('state-changed', this.snapshot())
       return this.snapshot()
     }
 
+    if (!this.getLegalDiscards(pid).includes(hand[tileIndex].id)) {
+      throw new Error('Riichi locks the hand: choose a highlighted discard')
+    }
+    this.state.riichiDeclarationPlayerId = null
     const discarded = hand.splice(tileIndex, 1)[0]
     this.state.players[pid].discards.push(discarded)
     this.state.players[pid].hand = sortByTag(this.state.players[pid].hand)
@@ -438,7 +446,33 @@ export class GameRunner {
     return this.snapshot()
   }
 
+  getLegalDiscards(playerId: PlayerId): string[] {
+    const s = this.state
+    if (s.phase !== 'discard' || s.currentPlayer !== playerId) return []
+    const p = s.players[playerId]
+    if (!p.riichi || isWinningHand(p.hand)) return p.hand.map(t => t.id)
+    if (s.riichiDeclarationPlayerId === playerId) return getRiichiDiscards(p.hand).map(t => t.id)
+    return s.lastDrawnTileId ? [s.lastDrawnTileId] : []
+  }
+
+  private finishIfWinning(playerId: PlayerId): boolean {
+    const s = this.state
+    const melds = s.revealedSets.filter(rs => rs.playerId === playerId)
+    if (!isWinningWithRevealedSets(s.players[playerId].hand, melds)) return false
+    s.phase = 'win'
+    s.winner = playerId
+    s.gameEndTime = Date.now()
+    this.emit('win', { player: playerId })
+    return true
+  }
+
   private advanceTurn(fromPlayer: PlayerId) {
+    if (this.state.wall.length === 0 && this.state.market.length === 0) {
+      this.state.phase = 'draw-game'
+      this.state.gameEndTime = Date.now()
+      this.emit('draw-game')
+      return
+    }
     const nextPlayer = ((fromPlayer + 1) % 4) as PlayerId
     this.state.currentPlayer = nextPlayer
     this.state.phase = 'draw'
@@ -529,22 +563,19 @@ export class GameRunner {
     player.hand = player.hand.filter(t => !removeIds.has(t.id))
     player.hand = sortByTag(player.hand)
 
-    // Total tiles = hand + revealed set tiles. Check for win.
+    // Check for win without allowing revealed melds to be reclassified.
     const myMelds = this.state.revealedSets.filter(rs => rs.playerId === callerId)
-    const meldTileCount = myMelds.reduce((sum, rs) => sum + rs.tiles.length, 0)
-    const totalTiles = player.hand.length + meldTileCount
-    if (totalTiles >= WIN_SIZE) {
-      if (this.isWinningPlayer(callerId)) {
-        this.state.phase = 'win'
-        this.state.winner = callerId
-        this.state.ponAvailable = null
-        this.state.ponDiscarderId = null
-        this.state.currentPlayer = callerId
-        this.emit('pon-called', { playerId: callerId, tile: claimedTile, tag: pon.matchingTag })
-        this.emit('win', { player: callerId })
-        this.emit('state-changed', this.snapshot())
-        return this.snapshot()
-      }
+    if (isWinningWithRevealedSets(player.hand, myMelds)) {
+      this.state.phase = 'win'
+      this.state.gameEndTime = Date.now()
+      this.state.winner = callerId
+      this.state.ponAvailable = null
+      this.state.ponDiscarderId = null
+      this.state.currentPlayer = callerId
+      this.emit('pon-called', { playerId: callerId, tile: claimedTile, tag: pon.matchingTag })
+      this.emit('win', { player: callerId })
+      this.emit('state-changed', this.snapshot())
+      return this.snapshot()
     }
 
     // Caller must now discard from their remaining hand
@@ -565,6 +596,19 @@ export class GameRunner {
     }
 
     const discarderId = this.state.ponDiscarderId!
+    const previous = this.state.ponAvailable!
+    const priority = (id: PlayerId) => (id - discarderId + 4) % 4
+    const next = this.checkPon(previous.tile, discarderId).find(candidate =>
+      priority(candidate.playerId) > priority(previous.playerId))
+    if (next) {
+      this.state.ponAvailable = {
+        playerId: next.playerId, tile: previous.tile, matchingTag: next.tag,
+        matchingTiles: this.findMatchingPair(next.playerId, previous.tile, next.tag),
+      }
+      this.emit('pon-declined')
+      this.emit('state-changed', this.snapshot())
+      return this.snapshot()
+    }
     this.state.ponAvailable = null
     this.state.ponDiscarderId = null
 
@@ -591,6 +635,7 @@ export class GameRunner {
     }
 
     player.riichi = true
+    this.state.riichiDeclarationPlayerId = playerId
     this.emit('riichi-declared', { playerId })
     this.emit('state-changed', this.snapshot())
     return this.snapshot()
@@ -599,7 +644,7 @@ export class GameRunner {
   /** For riichi players: auto-discard the drawn tile if it doesn't complete a win */
   riichiAutoDiscard(playerId: PlayerId): GameSnapshot | null {
     const player = this.state.players[playerId]
-    if (!player.riichi) return null
+    if (!player.riichi || this.state.currentPlayer !== playerId || this.state.riichiDeclarationPlayerId === playerId) return null
     if (this.state.phase !== 'discard') return null
     if (player.hand.length !== WIN_SIZE) return null
 
@@ -613,6 +658,33 @@ export class GameRunner {
     return this.discard(drawnId)
   }
 
+  aiDraw(): GameSnapshot {
+    const pid = this.state.currentPlayer
+    if (this.state.players[pid].isHuman) {
+      throw new Error('Cannot autoplay draw for human player.')
+    }
+    if (this.state.phase !== 'draw') {
+      throw new Error(`Cannot autoplay draw in phase "${this.state.phase}"`)
+    }
+
+    const pick = calculateAIMarketPick(
+      this.state.players[pid].hand,
+      this.state.market,
+      this.aiDifficulty,
+      this.state.tagCounts
+    )
+    if (pick) return this.pickMarket(pick.id)
+
+    try {
+      return this.drawBlind()
+    } catch (error) {
+      if (this.state.market.length > 0) {
+        return this.pickMarket(this.state.market[0].id)
+      }
+      throw error
+    }
+  }
+
   aiTurn(): GameSnapshot {
     const pid = this.state.currentPlayer
     if (this.state.players[pid].isHuman) {
@@ -620,24 +692,7 @@ export class GameRunner {
     }
 
     if (this.state.phase === 'draw') {
-      const pick = calculateAIMarketPick(
-        this.state.players[pid].hand,
-        this.state.market,
-        this.aiDifficulty,
-        this.state.tagCounts
-      )
-      if (pick) {
-        this.pickMarket(pick.id)
-      } else {
-        try {
-          this.drawBlind()
-        } catch {
-          // Wall empty, must pick from market
-          if (this.state.market.length > 0) {
-            this.pickMarket(this.state.market[0].id)
-          }
-        }
-      }
+      this.aiDraw()
     }
 
     if (this.state.phase === 'discard') {
@@ -645,8 +700,7 @@ export class GameRunner {
       const hand = player.hand
 
       const aiMelds = this.state.revealedSets.filter(rs => rs.playerId === pid)
-      const aiTileCount = hand.length + aiMelds.reduce((sum, rs) => sum + rs.tiles.length, 0)
-      if (aiTileCount === WIN_SIZE && this.isWinningPlayer(pid)) {
+      if (isWinningWithRevealedSets(hand, aiMelds)) {
         return this.discard(hand[0].id) // triggers win check
       }
 

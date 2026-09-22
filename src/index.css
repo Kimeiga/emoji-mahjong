@@ -4,7 +4,8 @@ html, body, #root {
   height: 100%;
   margin: 0;
   padding: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: #0f172a;
   color: white;
   font-family: system-ui, -apple-system, sans-serif;
@@ -48,3 +49,6 @@ html, body, #root {
     margin-bottom: 8px;
   }
 }
+
+#root { min-height: 100dvh; padding-bottom: env(safe-area-inset-bottom); box-sizing: border-box; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; } }

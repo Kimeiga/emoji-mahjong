@@ -17,8 +17,18 @@ function cleanKeywords(keywords: string[]): string[] {
 
 const enrichedMap = enrichedTags as Record<string, string[]>
 
+interface UnicodeEmojiEntry {
+  emoji: string
+  name: string
+  group: string
+  subgroup: string
+  keywords?: string[]
+}
+
+const unicodeEntries = unicodeData as UnicodeEmojiEntry[]
+
 /** All game-eligible emojis with enriched LLM tags merged with CLDR tags */
-export const ALL_EMOJI_DEFS: TileDef[] = (unicodeData as any[])
+export const ALL_EMOJI_DEFS: TileDef[] = unicodeEntries
   .map((entry) => {
     const cldrTags = cleanKeywords(entry.keywords ?? [])
     const llmTags = (enrichedMap[entry.emoji] ?? []).map((t: string) => t.toLowerCase().trim())

@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef } from 'react'
+import { useMemo, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useGame } from '../../contexts/GameContext'
 import { useGameStore } from '../../store/game-store'
@@ -10,7 +10,7 @@ import { findDisplayTriplets } from '../../engine/triplet-display'
 import { getStats, recordResult } from '../../utils/stats'
 
 export function ResultScreen() {
-  const { phase, winner, players, myPlayerId, mode, turnCount, gameStartTime, tagCounts, revealedSets } = useGame()
+  const { phase, winner, players, myPlayerId, mode, turnCount, gameStartTime, gameEndTime, tagCounts, revealedSets } = useGame()
   const startGame = useGameStore((s) => s.startGame)
   const setScreen = useAppStore((s) => s.setScreen)
   const disconnect = useAppStore((s) => s.disconnect)
@@ -41,7 +41,8 @@ export function ResultScreen() {
     return [...ponSets, ...handTriplets]
   }, [winnerPlayer, winner, tagCounts, revealedSets])
 
-  const elapsedSecs = Math.floor((Date.now() - gameStartTime) / 1000)
+  const [finishedAt] = useState(Date.now)
+  const elapsedSecs = gameStartTime > 0 ? Math.max(0, Math.floor(((gameEndTime || finishedAt) - gameStartTime) / 1000)) : 0
   const mins = Math.floor(elapsedSecs / 60)
   const secs = elapsedSecs % 60
 

@@ -39,8 +39,8 @@ function t(id: string, tags: string[], emoji = '🔲'): Tile {
  * Inject a controlled state into a GameRunner.
  * This lets us set up precise pon scenarios without randomness.
  */
-function injectState(runner: GameRunner, overrides: Record<string, any>) {
-  const state = (runner as any).state
+function injectState(runner: GameRunner, overrides: Record<string, unknown>) {
+  const state = (runner as unknown as { state: Record<string, unknown> }).state
   Object.assign(state, overrides)
 }
 
