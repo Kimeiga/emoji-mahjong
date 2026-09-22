@@ -13,15 +13,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          ref: fe1dd25b9298e5af7b3c095f2fa71f58ba250ce8
           persist-credentials: false
-      - name: Snapshot reviewed revisions
-        run: |
-          mkdir -p /tmp/emoji-sources
-          git archive --format=tar.gz --prefix=main/ ca17f0a2dbd8c594675e5b43ed0e0acd271058ad > /tmp/emoji-sources/main.tar.gz
-          git archive --format=tar.gz --prefix=pr1/ fe1dd25b9298e5af7b3c095f2fa71f58ba250ce8 > /tmp/emoji-sources/pr1.tar.gz
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Package offline tools
+        run: tar -czf /tmp/emoji-node-deps.tar.gz node_modules
       - uses: actions/upload-artifact@v4
         with:
-          name: emoji-source-snapshots
-          path: /tmp/emoji-sources/
-          retention-days: 3
+          name: emoji-node-deps
+          path: /tmp/emoji-node-deps.tar.gz
+          retention-days: 1
