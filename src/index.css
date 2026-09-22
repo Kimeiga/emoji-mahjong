@@ -17,6 +17,8 @@ html, body, #root {
 /* Keep both inspectors inside the viewport, even when the board is scrolled.
    Anchor-above positioning can put actions beyond the top edge on small screens. */
 .modal-above-hand, .modal-above-market {
+  /* Above hand/status controls (102/106), below the timed PON prompt (200). */
+  z-index: 120;
   position: fixed;
   top: 50%;
   bottom: auto;
