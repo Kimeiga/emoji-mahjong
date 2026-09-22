@@ -96,7 +96,7 @@ const slides = [
     ),
   },
   {
-    title: "Form 4 sets to win!",
+    title: "Form 4 different-tag sets to win!",
     content: (
       <div className="flex flex-col items-center gap-4">
         <div className="grid grid-cols-2 gap-2">
@@ -115,7 +115,7 @@ const slides = [
           ))}
         </div>
         <p className="text-slate-400 text-sm mt-1 text-center max-w-xs font-medium">
-          First to 4 sets wins. Highest score takes the crown!
+          Each set must use a different tag. First to complete all 4 wins; rare tags raise your score.
         </p>
       </div>
     ),
@@ -130,7 +130,7 @@ export default function TutorialOverlay({ onDone }: TutorialOverlayProps) {
 
   function handleNext() {
     if (isLast) {
-      localStorage.setItem("emoji-mahjong-tutorial-seen", "1")
+      (() => { try { localStorage.setItem("emoji-mahjong-tutorial-seen", "1") } catch { /* storage disabled */ } })()
       onDone()
     } else {
       setDirection(1)
@@ -139,7 +139,7 @@ export default function TutorialOverlay({ onDone }: TutorialOverlayProps) {
   }
 
   function handleSkip() {
-    localStorage.setItem("emoji-mahjong-tutorial-seen", "1")
+    (() => { try { localStorage.setItem("emoji-mahjong-tutorial-seen", "1") } catch { /* storage disabled */ } })()
     onDone()
   }
 

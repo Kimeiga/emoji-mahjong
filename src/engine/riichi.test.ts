@@ -35,8 +35,8 @@ function t(id: string, tags: string[], emoji = '🔲'): Tile {
   return { id, emoji, name: emoji, tags }
 }
 
-function injectState(runner: GameRunner, overrides: Record<string, any>) {
-  const state = (runner as any).state
+function injectState(runner: GameRunner, overrides: Record<string, unknown>) {
+  const state = (runner as unknown as { state: Record<string, unknown> }).state
   Object.assign(state, overrides)
 }
 

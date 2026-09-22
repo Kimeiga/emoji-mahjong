@@ -89,7 +89,7 @@ function MarketInspector({
 }
 
 export function MarketRow() {
-  const { market, phase, currentPlayer, myPlayerId, pickMarket, drawBlind, players, tagCounts } = useGame()
+  const { market, phase, currentPlayer, myPlayerId, pickMarket, drawBlind, players, tagCounts, wallCount } = useGame()
   const [inspecting, setInspecting] = useState<string | null>(null)
 
   const isMyDraw = currentPlayer === myPlayerId && phase === 'draw'
@@ -134,9 +134,11 @@ export function MarketRow() {
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               whileTap={{ scale: 0.9 }}
+              disabled={wallCount === 0}
+              aria-label="Draw blind from wall"
               onClick={drawBlind}
               className="w-10 h-10 rounded-lg bg-slate-700 border-2 border-dashed border-slate-500 flex items-center justify-center text-slate-400 hover:border-sky-400 hover:text-sky-400 transition-colors"
-              title="Draw blind from wall"
+              title={wallCount ? "Draw blind from wall" : "Wall empty: choose a market tile"}
             >
               <span className="text-lg">?</span>
             </motion.button>

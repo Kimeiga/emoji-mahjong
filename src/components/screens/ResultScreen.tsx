@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef } from 'react'
+import { useMemo, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { motion } from 'framer-motion'
 import { useGame } from '../../contexts/GameContext'
 import { useGameStore } from '../../store/game-store'
@@ -7,14 +7,15 @@ import { useMultiplayerStore } from '../../store/multiplayer-store'
 import { sendMessage } from '../../multiplayer/client'
 import { TagPill } from '../shared/Tile'
 import { findDisplayTriplets } from '../../engine/triplet-display'
-import { getStats, recordResult } from '../../utils/stats'
+import { getStats, getStatsSnapshot, subscribeStats, recordResult } from '../../utils/stats'
 
 export function ResultScreen() {
-  const { phase, winner, players, myPlayerId, mode, turnCount, gameStartTime, tagCounts, revealedSets } = useGame()
+  const { phase, winner, players, myPlayerId, mode, turnCount, gameStartTime, gameEndTime, tagCounts, revealedSets } = useGame()
   const startGame = useGameStore((s) => s.startGame)
   const setScreen = useAppStore((s) => s.setScreen)
   const disconnect = useAppStore((s) => s.disconnect)
   const ws = useAppStore((s) => s.ws)
+  const roomCode = useAppStore((s) => s.roomCode)
   const rematchVotes = useMultiplayerStore((s) => s.rematchVotes)
 
   const isDraw = phase === 'draw-game'
@@ -41,21 +42,25 @@ export function ResultScreen() {
     return [...ponSets, ...handTriplets]
   }, [winnerPlayer, winner, tagCounts, revealedSets])
 
-  const elapsedSecs = Math.floor((Date.now() - gameStartTime) / 1000)
+  const [finishedAt] = useState(Date.now)
+  const elapsedSecs = gameStartTime > 0 ? Math.max(0, Math.floor(((gameEndTime || finishedAt) - gameStartTime) / 1000)) : 0
   const mins = Math.floor(elapsedSecs / 60)
   const secs = elapsedSecs % 60
 
-  // Record stats once
+  const resultId = `${mode}:${roomCode ?? ''}:${gameStartTime}:${gameEndTime}:${myPlayerId}`
+
+  // Record stats once, including across saved-result reloads.
   const recorded = useRef(false)
   useEffect(() => {
     if (recorded.current) return
     recorded.current = true
-    if (isDraw) recordResult('draw')
-    else if (isHumanWin) recordResult('win')
-    else recordResult('loss')
-  }, [isDraw, isHumanWin])
+    if (isDraw) recordResult('draw', resultId)
+    else if (isHumanWin) recordResult('win', resultId)
+    else recordResult('loss', resultId)
+  }, [isDraw, isHumanWin, resultId])
 
-  const stats = getStats()
+  const statsSnapshot = useSyncExternalStore(subscribeStats, getStatsSnapshot)
+  const stats = getStats(statsSnapshot)
 
   function handlePlayAgain() {
     if (mode === 'local') {

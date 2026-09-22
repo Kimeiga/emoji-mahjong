@@ -8,7 +8,7 @@ import { type ServerMessage, type ClientMessage } from './protocol'
 function getWorkerOrigin(): string {
   if (typeof location === 'undefined') return ''
   // If we're on the worker URL already, use same origin
-  if (location.host.includes('workers.dev') || location.host.includes('localhost')) {
+  if (location.hostname.endsWith('.workers.dev') || location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     return ''
   }
   // Pages deployment → point to worker
@@ -36,7 +36,9 @@ export function sendMessage(ws: WebSocket, msg: ClientMessage) {
 
 export function parseServerMessage(data: string): ServerMessage | null {
   try {
-    return JSON.parse(data) as ServerMessage
+    const value: unknown = JSON.parse(data)
+    if (!value || typeof value !== 'object' || !('type' in value) || typeof value.type !== 'string') return null
+    return value as ServerMessage
   } catch {
     return null
   }

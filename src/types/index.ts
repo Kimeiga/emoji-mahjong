@@ -43,6 +43,9 @@ export interface RevealedSet {
 }
 
 export interface GameState {
+  gameStartTime: number
+  gameEndTime: number
+  riichiDeclarationPlayerId: PlayerId | null
   phase: GamePhase
   players: [Player, Player, Player, Player]
   wall: Tile[]
