@@ -15,7 +15,7 @@ interface TileProps {
 
 const sizes = {
   sm: 'w-8 h-8 text-xl',
-  md: 'w-10 h-10 text-2xl',
+  md: 'w-11 h-11 text-2xl',
   lg: 'w-14 h-14 text-4xl',
 }
 

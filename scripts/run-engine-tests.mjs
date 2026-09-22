@@ -10,6 +10,7 @@ const tests = [
   'src/engine/regression.test.ts',
   'src/engine/release.test.ts',
   'src/utils/stats.test.ts',
+  'src/engine/connections.test.ts',
 ]
 
 const outdir = await mkdtemp(join(tmpdir(), 'emoji-mahjong-tests-'))

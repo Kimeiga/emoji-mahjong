@@ -41,3 +41,13 @@ v62 persisted rooms had no resume tokens. For compatibility, a disconnected lega
 ## Releases
 
 Pull requests run the full quality suite. Every push to `main` repeats those checks, including browser tests, before deploying the Worker and Pages frontend. Failures prevent deployment; no test step is allowed to fail silently. Browser reports, failure traces, and screenshots are retained as workflow artifacts. Repository branch-protection settings are separate from these workflow files.
+
+## Connections-first experience
+
+The hand preview shows one maximum-set arrangement with distinct tags and no shared tiles. It does not move tiles or commit a strategy. Flexible previews and locked PON sets are labeled separately. Other connections can be explored and highlighted; the game rules and AI are unchanged. Bonus hand value is secondary to the race to four sets.
+
+New players get four untimed practice actions using real game emoji/tags: complete a pair, resolve a reused-tag conflict, discard while preserving a plan, and make a winning pick. The lesson can be skipped or replayed from the menu and does not record match statistics.
+
+Post-game feedback uses only the player's final hand and their own locked sets. A waiting tag describes a structurally winning draw, not tile availability or a move the player missed.
+
+`connections.test.ts` covers overlap, locked tags, preview stability, exact waiting-hand feedback and lesson correctness. The browser suite covers lesson mistakes/corrections, preview exploration without changing the hand, replay, keyboard controls and a short-screen layout, alongside all existing multiplayer and offline scenarios. Human playtesting is still needed to assess enjoyment and how readily new players understand the connections.

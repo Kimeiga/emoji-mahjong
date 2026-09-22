@@ -5,6 +5,7 @@ import { useGameStore } from '../../store/game-store'
 import { useAppStore } from '../../store/app-store'
 import { useMultiplayerStore } from '../../store/multiplayer-store'
 import { sendMessage } from '../../multiplayer/client'
+import { HandTakeaway } from './HandTakeaway'
 import { TagPill } from '../shared/Tile'
 import { findDisplayTriplets } from '../../engine/triplet-display'
 import { getStats, getStatsSnapshot, subscribeStats, recordResult } from '../../utils/stats'
@@ -78,7 +79,7 @@ export function ResultScreen() {
   }
 
   return (
-    <div className="h-full flex flex-col items-center justify-center gap-5 px-6">
+    <div className="min-h-full flex flex-col items-center justify-center gap-4 px-5 py-8">
       <motion.div
         initial={{ scale: 0.5, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -103,9 +104,10 @@ export function ResultScreen() {
           const total = allSets.reduce((sum, g) => sum + g.score, 0)
           return (
             <>
-              <div className="mt-3 text-2xl font-black text-amber-400">
-                {total} points
+              <div className="mt-3 text-sm font-medium text-slate-300">
+                {total} bonus hand value
               </div>
+              <p className="text-xs text-slate-400 mt-1">First to four sets wins. Rarity adds value, not a different winner.</p>
               <div className="mt-3 grid grid-cols-2 gap-2 max-w-sm mx-auto">
                 {allSets.map((group, gi) => (
                   <motion.div
@@ -132,7 +134,7 @@ export function ResultScreen() {
         })()}
 
         {isDraw && (
-          <p className="text-slate-400 mt-3 text-sm">Wall exhausted — no one completed 4 sets.</p>
+          <p className="text-slate-400 mt-3 text-sm">No tiles left to draw. No one completed four sets.</p>
         )}
 
         {/* Cumulative record */}
@@ -141,6 +143,7 @@ export function ResultScreen() {
         </div>
       </motion.div>
 
+      {!isHumanWin && <HandTakeaway hand={players[myPlayerId].hand} melds={revealedSets.filter(set => set.playerId === myPlayerId)} tagCounts={tagCounts} />}
       <div className="flex flex-col gap-3 w-full max-w-xs">
         {mode === 'local' && (
           <button

@@ -54,7 +54,7 @@ function OpponentCompact({ playerId, position }: { playerId: PlayerId; position:
       </span>
       <TileBacks count={player.hand.length} />
       {player.riichi && <span className="text-[8px] text-red-400 font-bold">RIICHI</span>}
-      {isActive && <span className="text-[8px] text-yellow-400">thinking...</span>}
+      {isActive && <span className="text-[10px] text-yellow-400">taking a turn</span>}
     </div>
   )
 
@@ -183,14 +183,14 @@ export function GameScreen() {
   const west = ((myPlayerId + 3) % 4) as PlayerId
 
   return (
-    <div className="h-full flex flex-col max-w-md mx-auto w-full">
+    <div className="min-h-full flex flex-col max-w-md mx-auto w-full game-screen">
       {mode === 'multiplayer' && <ReconnectBanner />}
       <PonToast />
       <RiichiToast />
 
       <DrawIndicator />
 
-      <div className="flex-1 flex flex-col min-h-0">
+      <div className="flex-1 flex flex-col min-h-[150px]">
         {/* North */}
         <div className="flex flex-col items-center py-1">
           <OpponentCompact playerId={north} position="north" />
@@ -198,7 +198,7 @@ export function GameScreen() {
         </div>
 
         {/* Middle: West - compass - East */}
-        <div className="flex-1 flex items-center justify-between px-1 min-h-0 relative">
+        <div className="flex-1 flex items-center justify-between px-1 min-h-[70px] relative">
           {/* West: opponent + discards stacked vertically toward center */}
           <div className="flex items-center gap-1">
             <OpponentCompact playerId={west} position="west" />
