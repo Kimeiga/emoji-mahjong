@@ -280,7 +280,7 @@ export function MenuScreen() {
           setScreen('multiplayer-game')
           setReconnecting(false)
         }
-        if (msg.type === 'room-state') {
+        if (msg.type === 'room-state' && !msg.gameStarted) {
           clearTimeout(timeout)
           setScreen('lobby')
           setReconnecting(false)

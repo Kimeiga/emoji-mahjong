@@ -62,6 +62,10 @@ test('single player: hard difficulty, inspection, legal actions, result and repl
     }
   }
   await expect(page.getByRole('button', {name:'Play Again', exact:true})).toBeVisible()
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('emoji-mahjong-stats') ?? '{}').gamesPlayed)).toBe(1)
+  const recorded = await page.evaluate(() => JSON.parse(localStorage.getItem('emoji-mahjong-stats') ?? '{}'))
+  expect(recorded.gamesPlayed).toBe(1)
+  await expect(page.locator('body')).toContainText(`Record: ${recorded.wins}W / ${recorded.losses}L / ${recorded.draws}D`)
   await page.screenshot({path:testInfo.outputPath('result.png'),fullPage:true})
   const ended = await localState(page)
   expect(['win','draw-game']).toContain(ended.phase)
