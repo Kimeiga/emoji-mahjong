@@ -25,7 +25,7 @@ jobs:
         run: npm run check
       - name: Browser tests
         run: |
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium webkit
           npm run test:browser
       - name: Commit generated dependency update
         run: |
