@@ -12,7 +12,7 @@
     "typecheck:worker": "tsc -p tsconfig.worker.json",
     "check": "npm run lint && npm run build && npm run typecheck:worker && npm test",
     "test:engine": "node scripts/run-engine-tests.mjs",
-    "test:worker": "node scripts/test-worker.mjs",
+    "test:worker": "node scripts/test-worker.mjs && node scripts/test-mixed-exit.mjs",
     "test:browser": "playwright test",
     "dev:worker": "wrangler dev --local --ip 127.0.0.1 --port 8787"
   },
