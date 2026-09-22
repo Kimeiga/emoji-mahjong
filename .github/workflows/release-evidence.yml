@@ -8,7 +8,7 @@ jobs:
   assemble:
     if: github.repository == 'Kimeiga/emoji-mahjong' && github.ref == 'refs/heads/fix/release-recovery-v63'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     permissions:
       contents: write
     steps:
@@ -20,13 +20,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 - <<'PY'
-          import base64, hashlib, json, lzma, os, pathlib, subprocess, urllib.request
+          import base64, hashlib, json, lzma, os, pathlib, subprocess, time, urllib.request, urllib.error
           def git(*args):
               return subprocess.check_output(['git', *args]).decode().strip()
           parts = sorted(pathlib.Path('.release-transfer').glob('part-*.b64'))
           assert len(parts) == 3
-          encoded = ''.join(p.read_text().strip() for p in parts)
-          patch = lzma.decompress(base64.b64decode(encoded, validate=True))
+          patch = lzma.decompress(base64.b64decode(''.join(p.read_text().strip() for p in parts), validate=True))
           assert hashlib.sha256(patch).hexdigest() == '02cc2c16bc68bdb4c7bc9365c869a792a884cb6e9993dd9b4bc92cf80cead0c5'
           path = pathlib.Path('/tmp/emoji-release.patch')
           path.write_bytes(patch)
@@ -34,36 +33,51 @@ jobs:
           subprocess.run(['git', 'apply', '--index', str(path)], check=True)
           subprocess.run(['git', 'rm', '-r', '.release-transfer', '.github/workflows/release-evidence.yml'], check=True)
           expected = 'c0408b63830088a0c421adc7ea8324c0736817d4'
-          assert git('write-tree') == expected, 'Candidate differs from the locally tested source tree'
+          assert git('write-tree') == expected
           def api(endpoint, payload):
-              req = urllib.request.Request('https://api.github.com/repos/Kimeiga/emoji-mahjong/git/' + endpoint,
-                  data=json.dumps(payload).encode(), method='POST', headers={
-                    'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
-                    'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json',
-                    'X-GitHub-Api-Version': '2022-11-28'})
-              with urllib.request.urlopen(req, timeout=30) as response:
-                  return json.load(response)
+              for attempt in range(3):
+                  time.sleep(1.2)
+                  req = urllib.request.Request('https://api.github.com/repos/Kimeiga/emoji-mahjong/git/' + endpoint,
+                      data=json.dumps(payload).encode(), method='POST', headers={
+                        'Authorization': 'Bearer ' + os.environ['GH_TOKEN'],
+                        'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json',
+                        'X-GitHub-Api-Version': '2022-11-28'})
+                  try:
+                      with urllib.request.urlopen(req, timeout=30) as response:
+                          return json.load(response)
+                  except urllib.error.HTTPError as error:
+                      detail = error.read().decode()
+                      print('GitHub API', endpoint, error.code, detail, flush=True)
+                      if error.code in (403, 429) and ('rate limit' in detail.lower() or error.headers.get('Retry-After')) and attempt < 2:
+                          delay = int(error.headers.get('Retry-After', '60'))
+                          if delay > 120: raise
+                          time.sleep(delay)
+                      else: raise
           entries = []
           names = subprocess.check_output(['git', 'diff', '--cached', '--name-status', '--no-renames', '-z']).decode().split('\0')
           for i in range(0, len(names)-1, 2):
               status, filename = names[i:i+2]
               entry = {'path': filename, 'mode': '100644', 'type': 'blob'}
-              if status == 'D':
-                  entry['sha'] = None
+              if status == 'D': entry['sha'] = None
               else:
                   content = subprocess.check_output(['git', 'show', ':' + filename])
                   entry['sha'] = api('blobs', {'content': base64.b64encode(content).decode(), 'encoding': 'base64'})['sha']
               entries.append(entry)
+              print(filename, entry['sha'], flush=True)
+              pathlib.Path('/tmp/blob-evidence.json').write_text(json.dumps(entries, indent=2))
           tree = api('trees', {'base_tree': git('rev-parse', 'HEAD^{tree}'), 'tree': entries})
           assert tree['sha'] == expected
           commit = api('commits', {'message': 'Fix recovery, hidden-hand privacy, legal gameplay and release regression gates',
               'tree': tree['sha'], 'parents': [git('rev-parse', 'HEAD')]})
           metadata = {'commit_sha': commit['sha'], 'tree_sha': tree['sha'], 'parent_sha': git('rev-parse', 'HEAD'), 'patch_sha256': hashlib.sha256(patch).hexdigest()}
           pathlib.Path('/tmp/candidate.json').write_text(json.dumps(metadata, indent=2))
-          print(json.dumps(metadata))
+          print(json.dumps(metadata), flush=True)
           PY
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: verified-release-candidate
-          path: /tmp/candidate.json
+          path: |
+            /tmp/candidate.json
+            /tmp/blob-evidence.json
           retention-days: 3
