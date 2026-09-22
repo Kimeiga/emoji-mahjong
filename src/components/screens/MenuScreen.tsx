@@ -265,7 +265,8 @@ export function MenuScreen() {
       setupConnection(session.roomCode, session.playerName, (msg) => {
         if (msg.type === 'error') {
           clearTimeout(timeout)
-          clearSession()
+          // Network failures and replaced tabs must not erase a resumable seat.
+          if (msg.code === 'SESSION_INVALID') clearSession()
           setReconnecting(false)
           return
         }

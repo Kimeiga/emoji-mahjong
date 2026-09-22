@@ -21,11 +21,11 @@ export function setupConnection(roomCode: string, playerName: string, onMessage:
   const session = getSession()
   let resumeToken = session?.roomCode === roomCode ? session.resumeToken : undefined
   const store = () => useMultiplayerStore.getState()
-  function fail(message: string) {
+  function fail(message: string, code?: string) {
     stopped = true
     store().setReconnecting(false)
     store().setConnectionError(message)
-    onMessage({ type: 'error', message })
+    onMessage({ type: 'error', message, code })
   }
   function connect() {
     if (id !== generation || stopped) return
@@ -53,7 +53,7 @@ export function setupConnection(roomCode: string, playerName: string, onMessage:
       }
       if (msg.type === 'error' && msg.code) {
         clearTimeout(handshakeTimer)
-        fail(msg.message)
+        fail(msg.message, msg.code)
         ws.close()
         return
       }
@@ -92,11 +92,22 @@ export function setupConnection(roomCode: string, playerName: string, onMessage:
     connect()
   }
   if (typeof window !== 'undefined') {
+    const offline = () => {
+      if (id !== generation || stopped) return
+      clearTimeout(timer)
+      clearTimeout(handshakeTimer)
+      const previous = currentWs
+      currentWs = null
+      useAppStore.getState().setWs(null)
+      store().setReconnecting(true)
+      previous?.close()
+    }
     const online = () => { if (!currentWs || currentWs.readyState !== WebSocket.OPEN) retry?.() }
     const visible = () => { if (document.visibilityState === 'visible' && getSession()?.roomCode === roomCode) retry?.() }
+    window.addEventListener('offline', offline)
     window.addEventListener('online', online)
     document.addEventListener('visibilitychange', visible)
-    removeNetworkListeners = () => { window.removeEventListener('online', online); document.removeEventListener('visibilitychange', visible) }
+    removeNetworkListeners = () => { window.removeEventListener('offline', offline); window.removeEventListener('online', online); document.removeEventListener('visibilitychange', visible) }
   }
   connect()
 }

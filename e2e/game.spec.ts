@@ -1,4 +1,8 @@
 import { test, expect, devices, type Page } from '@playwright/test'
+import { createServer } from 'node:http'
+import { readFile } from 'node:fs/promises'
+import { resolve, extname, sep } from 'node:path'
+import type { AddressInfo } from 'node:net'
 import type { GameRunner } from '../src/engine/game-runner'
 import type { GameStateView } from '../src/multiplayer/protocol'
 
@@ -15,7 +19,7 @@ test('tutorial states the actual distinct-tag victory rule', async ({ page }) =>
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message))
   await page.goto('/')
   for (let i = 0; i < 4; i++) await page.getByRole('button', {name:'Next', exact:true}).click()
-  await expect(page.locator('body')).toContainText(/different tags|distinct tags/i)
+  await expect(page.locator('body')).toContainText('Each set must use a different tag.')
   await expect(page.locator('body')).not.toContainText('Highest score takes the crown')
   await page.getByRole('button', {name:'Play!', exact:true}).click()
   await expect(page.getByRole('button', {name:'Single Player', exact:true})).toBeVisible()
@@ -108,7 +112,7 @@ test('two players: private hands, full disconnect, reload and original seats', a
       await context.setOffline(true)
       await page.evaluate(()=>(window as Window & {__closeTestSockets?:()=>void}).__closeTestSockets?.())
     }
-    await expect(one.getByRole('status')).toContainText('Reconnecting')
+    await expect(one.getByRole('status').filter({hasText:'Reconnecting'})).toBeVisible()
     await oneContext.setOffline(false); await twoContext.setOffline(false)
     await one.reload(); await two.reload()
     await expect(one.locator('.hand-anchor')).toBeVisible()
@@ -123,13 +127,53 @@ test('two players: private hands, full disconnect, reload and original seats', a
   } finally { await oneContext.close(); await twoContext.close() }
 })
 
-test('single-player shell reloads offline after the first successful load', async ({ page, context }) => {
-  await skipTutorial(page)
-  await page.evaluate(async()=>{await navigator.serviceWorker.ready})
-  await expect.poll(()=>page.evaluate(()=>!!navigator.serviceWorker.controller)).toBeTruthy()
-  await context.setOffline(true)
-  await page.reload()
-  await page.getByRole('button', {name:'Single Player',exact:true}).click()
-  await expect(page.locator('.hand-anchor [data-tile-id]')).toHaveCount(11)
-  await context.setOffline(false)
+// WebKit's offline flag rejects even literal SW navigation responses upstream:
+// https://github.com/microsoft/playwright/issues/42775
+// A dedicated origin that is actually stopped tests the real built cache fallback,
+// without mocking a response or claiming that it reproduces airplane mode.
+async function startShellOrigin() {
+  const root = resolve('dist')
+  const server = createServer(async (request, response) => {
+    const pathname = new URL(request.url ?? '/', 'http://local').pathname
+    const path = resolve(root, '.' + (pathname === '/' ? '/index.html' : pathname))
+    if (!path.startsWith(root + sep)) { response.writeHead(403).end(); return }
+    try {
+      const body = await readFile(path)
+      const types: Record<string, string> = {'.html':'text/html', '.js':'text/javascript', '.css':'text/css', '.json':'application/json', '.png':'image/png', '.svg':'image/svg+xml'}
+      response.writeHead(200, {'Content-Type':types[extname(path)] ?? 'application/octet-stream', 'Cache-Control':'no-store'})
+      response.end(body)
+    } catch { response.writeHead(404).end() }
+  })
+  await new Promise<void>((done, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', done) })
+  return {
+    origin: `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+    stop: () => new Promise<void>((done, reject) => {
+      if (!server.listening) { done(); return }
+      server.close(error => error ? reject(error) : done())
+      server.closeAllConnections()
+    }),
+  }
+}
+
+test('single-player shell reloads from its cache without an available origin', async ({ page, context, browserName }, testInfo) => {
+  const server = browserName === 'webkit' ? await startShellOrigin() : null
+  try {
+    if (server) {
+      testInfo.annotations.push({type:'coverage', description:'WebKit: actual origin shutdown, not Playwright offline emulation (upstream #42775).'})
+      await page.goto(server.origin)
+      await page.getByRole('button', {name:'Skip',exact:true}).click()
+    } else await skipTutorial(page)
+    await page.evaluate(async()=>{await navigator.serviceWorker.ready})
+    await expect.poll(()=>page.evaluate(()=>!!navigator.serviceWorker.controller)).toBeTruthy()
+    expect(await page.evaluate(async()=>!!await caches.match('/'))).toBeTruthy()
+    if (server) {
+      await server.stop()
+      await expect(fetch(server.origin)).rejects.toThrow()
+    } else await context.setOffline(true)
+    const response = await page.reload()
+    expect(response?.status()).toBe(200)
+    expect(response?.fromServiceWorker()).toBeTruthy()
+    await page.getByRole('button', {name:'Single Player',exact:true}).click()
+    await expect(page.locator('.hand-anchor [data-tile-id]')).toHaveCount(11)
+  } finally { await context.setOffline(false); await server?.stop() }
 })
