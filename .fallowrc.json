@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "minimumVersion": "3.23.0",
+  "entry": [
+    "scripts/**/*.ts",
+    "scripts/**/*.mjs",
+    "worker/**/*.ts"
+  ],
+  "ignoreFindings": [
+    "public/sw.js"
+  ],
+  "audit": {
+    "gate": "new-only"
+  }
+}

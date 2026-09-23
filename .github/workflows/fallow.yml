@@ -1,0 +1,21 @@
+name: Fallow audit
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: fallow-rs/fallow@v3
+        with:
+          command: audit
+          version: 3.23.0
+          gate: new-only
+          fail-on-issues: true
