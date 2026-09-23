@@ -5,7 +5,6 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   audit:
@@ -17,5 +16,6 @@ jobs:
       - uses: fallow-rs/fallow@v3
         with:
           command: audit
+          version: 3.23.0
           gate: new-only
           fail-on-issues: true
