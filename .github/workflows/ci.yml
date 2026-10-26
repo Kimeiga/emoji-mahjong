@@ -30,6 +30,8 @@ jobs:
         run: npm run check
       - name: Twinwire resume, takeover, private hands and durable restart
         run: npm run test:twinwire
+      - name: Use the official Ubuntu archive with bounded download retries
+        run: bash scripts/prepare-browser-runner.sh
       - name: Install browser engines
         run: npx playwright install --with-deps chromium webkit
       - name: Desktop, Android-sized and iPhone-sized browser regressions
