@@ -25,3 +25,5 @@ dist-ssr
 .wrangler
 test-results/
 playwright-report/
+
+/artifacts/

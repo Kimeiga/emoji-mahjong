@@ -1,3 +1,4 @@
+import { SocketSessionServer } from 'twinwire/worker'
 /**
  * GameRoom Durable Object — manages a single multiplayer game room.
  *
@@ -17,6 +18,14 @@ import type {
 import { parseClientMessage } from '../src/multiplayer/validation'
 import type { PlayerId } from '../src/types'
 
+interface RoomPeer {
+  readonly readyState: number
+  readonly twinwire?: true
+  send(data: string): void
+  close(code?: number, reason?: string): void
+}
+type RoomMessage = ServerMessage | {type: '$twinwire-ready'}
+
 interface PlayerInfo {
   playerId: PlayerId
   name: string
@@ -27,7 +36,7 @@ interface Env {
 }
 
 export class GameRoom implements DurableObject {
-  private players: Map<WebSocket, PlayerInfo> = new Map()
+  private players: Map<RoomPeer, PlayerInfo> = new Map()
   private runner: GameRunner | null = null
   private roomCode = ''
   private aiDifficulty: AIDifficulty = 'medium'
@@ -37,15 +46,49 @@ export class GameRoom implements DurableObject {
   private expiresAt = 0
   private seatTokens: Record<number, string> = {}
   private queue: Promise<void> = Promise.resolve()
-  private outbox: { ws: WebSocket; msg: ServerMessage }[] | null = null
+  private outbox: { ws: RoomPeer; msg: RoomMessage }[] | null = null
   private rematchVotes: Set<PlayerId> = new Set()
   private aiTimer: ReturnType<typeof setTimeout> | null = null
   private ctx: DurableObjectState
   private env: Env
+  private transport: SocketSessionServer
 
   constructor(ctx: DurableObjectState, env: Env) {
     this.ctx = ctx
     this.env = env
+
+    this.transport = new SocketSessionServer({
+      origins: origin => {
+        try {
+          const url = new URL(origin)
+          return ['http:', 'https:'].includes(url.protocol) && (
+            ['localhost','127.0.0.1','emoji-mahjong.hak7alp.workers.dev','emojimahjong.pages.dev','hakanalpay.com','www.hakanalpay.com'].includes(url.hostname) ||
+            url.hostname.endsWith('.emojimahjong.pages.dev'))
+        } catch { return false }
+      },
+      allowMissingOrigin: true,
+      resumeGraceMs: 30_000,
+      maxSessions: 12,
+      maxConnections: 16,
+      authenticate: request => request.room === 'mahjong.' + this.roomCode ? this.roomCode : null,
+      onSession: (session, resumed) => {
+        if (resumed) {
+          this.enqueue(() => this.restoreTransport(session.data as RoomPeer))
+          return
+        }
+        const peer: RoomPeer = {
+          twinwire: true,
+          get readyState() { return session.connected ? 1 : 3 },
+          send: data => { if (!session.sendEvent(JSON.parse(data))) this.transport.endSession(session, 'Slow consumer; reopen your saved game') },
+          close: (_code, reason) => this.transport.endSession(session, reason),
+        }
+        session.data = peer
+        session.onEvent = data => this.enqueue(() => this.handleMessage(peer, JSON.stringify(data)))
+      },
+      onDisconnect: session => this.enqueue(() => this.pauseTransport(session.data as RoomPeer)),
+      onExpire: session => this.enqueue(() => this.handleDisconnect(session.data as RoomPeer)),
+      onError: error => console.error('[twinwire]', error.message),
+    })
 
     this.ctx.blockConcurrencyWhile(async () => {
       const saved = await this.ctx.storage.get<{
@@ -117,7 +160,7 @@ export class GameRoom implements DurableObject {
 
   async alarm(): Promise<void> {
     this.enqueue(() => {
-      if (!this.expiresAt || this.expiresAt > Date.now() || this.players.size) return
+      if (!this.expiresAt || this.expiresAt > Date.now() || this.onlineCount()) return
       this.runner = null
       this.gameStarted = false
       this.gameStartedAt = 0
@@ -177,7 +220,11 @@ export class GameRoom implements DurableObject {
     const [client, server] = [pair[0], pair[1]]
 
     server.accept()
-
+    if (url.searchParams.get('tw') === '4') {
+      this.transport.accept(server, {origin: request.headers.get('origin') ?? '', ip: request.headers.get('CF-Connecting-IP') ?? 'local'})
+      return new Response(null, {status: 101, webSocket: client})
+    }
+    // One-release compatibility for already open legacy clients during the paired rollout.
     server.addEventListener('message', (event) => {
       this.enqueue(() => this.handleMessage(server, event.data))
     })
@@ -193,7 +240,7 @@ export class GameRoom implements DurableObject {
     return new Response(null, { status: 101, webSocket: client })
   }
 
-  private handleMessage(ws: WebSocket, raw: string | ArrayBuffer) {
+  private handleMessage(ws: RoomPeer, raw: string | ArrayBuffer) {
     const msg = parseClientMessage(raw)
     if (!msg) {
       this.send(ws, { type: 'error', message: 'Invalid message' })
@@ -206,6 +253,7 @@ export class GameRoom implements DurableObject {
     switch (msg.type) {
       case 'join':
         this.handleJoin(ws, msg.playerName, msg.resumeToken)
+        if (ws.twinwire && this.players.has(ws)) this.restoreTransport(ws)
         break
       case 'set-ai-difficulty':
         this.handleSetAIDifficulty(msg.difficulty)
@@ -242,7 +290,7 @@ export class GameRoom implements DurableObject {
     }
   }
 
-  private handleJoin(ws: WebSocket, playerName: string, resumeToken?: string) {
+  private handleJoin(ws: RoomPeer, playerName: string, resumeToken?: string) {
     const assigned = this.players.get(ws)
     if (assigned) {
       this.send(ws, { type: 'assigned', playerId: assigned.playerId, resumeToken: this.seatTokens[assigned.playerId] })
@@ -341,7 +389,7 @@ export class GameRoom implements DurableObject {
     this.scheduleAITurns()
   }
 
-  private handleDiscard(ws: WebSocket, tileId: string) {
+  private handleDiscard(ws: RoomPeer, tileId: string) {
     if (!this.runner || !this.gameStarted) return
     const info = this.players.get(ws)
     if (!info) return
@@ -368,7 +416,7 @@ export class GameRoom implements DurableObject {
     this.scheduleAITurns()
   }
 
-  private handleCallPon(ws: WebSocket) {
+  private handleCallPon(ws: RoomPeer) {
     if (!this.runner || !this.gameStarted) return
     const info = this.players.get(ws)
     if (!info) return
@@ -400,7 +448,7 @@ export class GameRoom implements DurableObject {
     this.scheduleAITurns()
   }
 
-  private handleDeclinePon(ws: WebSocket, tileId?: string) {
+  private handleDeclinePon(ws: RoomPeer, tileId?: string) {
     if (!this.runner || !this.gameStarted) return
     const info = this.players.get(ws)
     if (!info) return
@@ -422,7 +470,7 @@ export class GameRoom implements DurableObject {
     this.scheduleAITurns()
   }
 
-  private handleDeclareRiichi(ws: WebSocket) {
+  private handleDeclareRiichi(ws: RoomPeer) {
     if (!this.runner || !this.gameStarted) return
     const info = this.players.get(ws)
     if (!info) return
@@ -442,7 +490,7 @@ export class GameRoom implements DurableObject {
     this.broadcastGameState()
   }
 
-  private handlePickMarket(ws: WebSocket, tileId: string) {
+  private handlePickMarket(ws: RoomPeer, tileId: string) {
     if (!this.runner || !this.gameStarted) return
     const info = this.players.get(ws)
     if (!info) return
@@ -458,7 +506,7 @@ export class GameRoom implements DurableObject {
     this.scheduleAITurns()
   }
 
-  private handleDrawBlind(ws: WebSocket) {
+  private handleDrawBlind(ws: RoomPeer) {
     if (!this.runner || !this.gameStarted) return
     const info = this.players.get(ws)
     if (!info) return
@@ -474,7 +522,7 @@ export class GameRoom implements DurableObject {
     this.scheduleAITurns()
   }
 
-  private handleRematch(ws: WebSocket) {
+  private handleRematch(ws: RoomPeer) {
     const info = this.players.get(ws)
     if (!info) return
 
@@ -512,7 +560,7 @@ export class GameRoom implements DurableObject {
     }
   }
 
-  private handleLeave(ws: WebSocket) {
+  private handleLeave(ws: RoomPeer) {
     const info = this.players.get(ws)
     if (!info) return
     this.players.delete(ws)
@@ -539,7 +587,7 @@ export class GameRoom implements DurableObject {
       this.expiresAt = 0
       this.rematchVotes.clear()
       this.removeFromRegistry()
-    } else if (this.players.size === 0) {
+    } else if (this.onlineCount() === 0) {
       // Preserve absent humans using the same expiry policy as a full network loss.
       // scheduleAITurns below cancels pending timers while no clients are connected.
       this.expiresAt = Date.now() + 30 * 60_000
@@ -551,7 +599,39 @@ export class GameRoom implements DurableObject {
     ws.close(1000, 'Left room')
   }
 
-  private handleDisconnect(ws: WebSocket) {
+  private onlineCount(): number {
+    return [...this.players.keys()].filter(peer => peer.readyState === 1).length
+  }
+
+  private pauseTransport(ws: RoomPeer) {
+    const info = this.players.get(ws)
+    if (!info) return
+    const player = this.lobbyPlayers.find(p => p.id === info.playerId)
+    if (player) player.connected = false
+    if (!this.onlineCount()) {
+      if (this.aiTimer) clearTimeout(this.aiTimer)
+      this.aiTimer = null
+      this.expiresAt = Date.now() + 30 * 60_000
+      this.removeFromRegistry()
+    }
+    this.broadcastRoomState()
+  }
+
+  private restoreTransport(ws: RoomPeer) {
+    const info = this.players.get(ws)
+    if (!info) return
+    const player = this.lobbyPlayers.find(p => p.id === info.playerId)
+    if (player) player.connected = true
+    this.expiresAt = 0
+    this.send(ws, {type:'assigned',playerId:info.playerId,resumeToken:this.seatTokens[info.playerId]})
+    this.broadcastRoomState()
+    this.sendGameStateToPlayer(ws, info.playerId)
+    this.send(ws, {type:'$twinwire-ready'})
+    this.updateRegistry()
+    this.scheduleAITurns()
+  }
+
+  private handleDisconnect(ws: RoomPeer) {
     const info = this.players.get(ws)
     if (info) {
       const lp = this.lobbyPlayers.find((p) => p.id === info.playerId)
@@ -563,7 +643,7 @@ export class GameRoom implements DurableObject {
     if (!info) return // An old, replaced socket must not affect the new session.
     this.rematchVotes.delete(info.playerId)
     // Keep the same hand and turn through a whole-room network interruption.
-    if (this.players.size === 0) {
+    if (this.onlineCount() === 0) {
       if (this.aiTimer) clearTimeout(this.aiTimer)
       this.aiTimer = null
       this.expiresAt = Date.now() + 30 * 60_000
@@ -576,7 +656,7 @@ export class GameRoom implements DurableObject {
 
   // ── Broadcasting ──
 
-  private send(ws: WebSocket, msg: ServerMessage) {
+  private send(ws: RoomPeer, msg: RoomMessage) {
     if (this.outbox) {
       this.outbox.push({ ws, msg: structuredClone(msg) })
       return
@@ -611,7 +691,7 @@ export class GameRoom implements DurableObject {
     }
   }
 
-  private sendGameStateToPlayer(ws: WebSocket, playerId: PlayerId) {
+  private sendGameStateToPlayer(ws: RoomPeer, playerId: PlayerId) {
     if (!this.runner) return
 
     const snapshot = this.runner.snapshot({ forPlayer: playerId })
@@ -668,7 +748,7 @@ export class GameRoom implements DurableObject {
       this.aiTimer = null
     }
 
-    if (!this.runner || this.players.size === 0) return
+    if (!this.runner || this.onlineCount() === 0) return
     const state = this.runner.getState()
 
     // Game over — nothing to do

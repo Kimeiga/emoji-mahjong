@@ -14,7 +14,8 @@
     "test:engine": "node scripts/run-engine-tests.mjs",
     "test:worker": "node scripts/test-worker.mjs && node scripts/test-mixed-exit.mjs",
     "test:browser": "playwright test",
-    "dev:worker": "wrangler dev --local --ip 127.0.0.1 --port 8787"
+    "dev:worker": "wrangler dev --local --ip 127.0.0.1 --port 8787",
+    "test:twinwire": "node scripts/test-twinwire.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -23,6 +24,7 @@
     "framer-motion": "^12.38.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "twinwire": "2.2.0",
     "zustand": "^5.0.12"
   },
   "devDependencies": {

@@ -28,10 +28,14 @@ jobs:
       - run: npm ci
       - name: Lint, build, Worker types, engine and runtime regressions
         run: npm run check
+      - name: Twinwire resume, takeover, private hands and durable restart
+        run: npm run test:twinwire
       - name: Install browser engines
         run: npx playwright install --with-deps chromium webkit
       - name: Desktop, Android-sized and iPhone-sized browser regressions
         run: npm run test:browser
+      - name: Optional browser storage remains optional during recovery
+        run: BLOCK_SESSION_STORAGE=1 npx playwright test --grep 'two players'
       - uses: actions/upload-artifact@v4
         if: always()
         with:

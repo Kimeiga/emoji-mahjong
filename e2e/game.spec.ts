@@ -126,6 +126,9 @@ test('two players: private hands, full disconnect, reload and original seats', a
   one.on('pageerror', e=>errors.push(e.message)); two.on('pageerror', e=>errors.push(e.message))
   try {
     for (const context of [oneContext, twoContext]) {
+      if(process.env.BLOCK_SESSION_STORAGE === '1') await context.addInitScript(() => {
+        Object.defineProperty(window,'sessionStorage',{get(){throw new DOMException('Storage disabled for regression','SecurityError')}})
+      })
       await context.addInitScript(() => {
         const sockets: WebSocket[] = []
         const Native = window.WebSocket
