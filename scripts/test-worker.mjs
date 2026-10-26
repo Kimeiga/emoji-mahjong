@@ -1,21 +1,12 @@
+import {buildWorkerOptions} from './worker-fixture.mjs'
 import assert from 'node:assert/strict'
-import { build } from 'esbuild'
 import { Miniflare } from 'miniflare'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
 const directory = await mkdtemp(join(tmpdir(), 'mahjong-worker-'))
-const scriptPath = join(directory, 'worker.mjs')
-await build({ entryPoints: ['worker/index.ts'], outfile: scriptPath, bundle: true, format: 'esm', platform: 'browser', target: 'es2023' })
-const options = {
-  modules: true, modulesRoot: directory, scriptPath, compatibilityDate: '2025-01-01',
-  durableObjects: {
-    GAME_ROOM: { className: 'GameRoom', useSQLite: true },
-    ROOM_REGISTRY: { className: 'RoomRegistry', useSQLite: true },
-  },
-  durableObjectsPersist: join(directory, 'storage'),
-}
+const options=await buildWorkerOptions(directory)
 let mf = new Miniflare(options)
 const clients = []
 let checks = 0

@@ -1,3 +1,4 @@
+import type {RoomClient} from '../multiplayer/client'
 import { create } from 'zustand'
 import type { AIDifficulty } from '../multiplayer/protocol'
 import { clearSession } from '../utils/session'
@@ -8,12 +9,12 @@ export type Screen = 'menu' | 'single-player' | 'lobby' | 'multiplayer-game' | '
 interface AppStore {
   screen: Screen
   roomCode: string | null
-  ws: WebSocket | null
+  ws: RoomClient | null
   myPlayerId: number
   aiDifficulty: AIDifficulty
   setScreen: (screen: Screen) => void
   setRoomCode: (code: string) => void
-  setWs: (ws: WebSocket | null) => void
+  setWs: (ws: RoomClient | null) => void
   setMyPlayerId: (id: number) => void
   setAiDifficulty: (d: AIDifficulty) => void
   disconnect: () => void

@@ -26,6 +26,8 @@ jobs:
       - run: npm ci
       - name: Lint, build, Worker types, engine and runtime regressions
         run: npm run check
+      - name: Twinwire resume, takeover, private hands and durable restart
+        run: npm run test:twinwire
       - name: Install browser engines
         run: npx playwright install --with-deps chromium webkit
       - name: Desktop, Android-sized and iPhone-sized browser regressions

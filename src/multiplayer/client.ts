@@ -1,3 +1,4 @@
+import {GameClient, type ClientCheckpoint} from 'twinwire/client'
 import { type ServerMessage, type ClientMessage } from './protocol'
 
 /**
@@ -19,19 +20,51 @@ export function getApiUrl(path: string): string {
   return `${getWorkerOrigin()}${path}`
 }
 
-export function connectToRoom(roomCode: string): WebSocket {
-  const origin = getWorkerOrigin()
-  if (origin) {
-    return new WebSocket(`wss://${origin.replace('https://', '')}/api/rooms/${roomCode}/ws`)
-  }
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return new WebSocket(`${proto}//${location.host}/api/rooms/${roomCode}/ws`)
+/** The game's small connection view; Twinwire owns sockets, retry, ACKs and session replay. */
+export interface RoomClient {
+  net: GameClient
+  readonly readyState: number
+  send(data: string): void
+  close(): void
+  saveCheckpoint(): void
+  clearCheckpoint(): void
 }
 
-export function sendMessage(ws: WebSocket, msg: ClientMessage) {
-  if (ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(msg))
+function readCheckpoint(key: string): ClientCheckpoint | undefined {
+  try { return JSON.parse(sessionStorage.getItem(key) || 'null') ?? undefined } catch { return undefined }
+}
+
+function createResumableClient(options: ConstructorParameters<typeof GameClient>[0], key: string, forget: () => void) {
+  try { return new GameClient({...options, checkpoint: readCheckpoint(key)}) }
+  catch { forget(); return new GameClient(options) }
+}
+
+function socketReadyState(status: GameClient['status']): number {
+  if (status === 'online') return 1
+  return status === 'closed' || status === 'lost' ? 3 : 0
+}
+
+export function connectToRoom(roomCode: string): RoomClient {
+  const base = getWorkerOrigin() || location.origin
+  const url = new URL('/api/rooms/' + roomCode + '/ws?tw=4', base)
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+  const key = 'twinwire.mahjong.' + roomCode
+  const forget = () => { try { sessionStorage.removeItem(key) } catch { /* Storage is optional for in-page recovery. */ } }
+  const options = {url: url.href, room: 'mahjong.' + roomCode, rtc: false as const}
+  const net = createResumableClient(options, key, forget)
+  const client: RoomClient = {
+    net,
+    get readyState() { return socketReadyState(net.status) },
+    send(data) { if (!net.sendEvent(JSON.parse(data))) throw new Error('Connection queue is full; reconnect to your saved game'); client.saveCheckpoint() },
+    close() { net.close() },
+    saveCheckpoint() { try { const saved = net.checkpoint(); if (saved) sessionStorage.setItem(key,JSON.stringify(saved)) } catch { /* The private game-seat token is a separate recovery path. */ } },
+    clearCheckpoint: forget,
   }
+  return client
+}
+
+export function sendMessage(client: RoomClient, msg: ClientMessage) {
+  if (client.readyState === 1) client.send(JSON.stringify(msg))
 }
 
 export function parseServerMessage(data: string): ServerMessage | null {
