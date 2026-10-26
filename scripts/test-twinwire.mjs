@@ -1,15 +1,13 @@
+import {buildWorkerOptions} from './worker-fixture.mjs'
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import {build} from 'esbuild'
 import {Miniflare,Log,LogLevel} from 'miniflare'
 import {GameClient} from 'twinwire/client'
 const parent=path.resolve('artifacts')
 await fs.mkdir(parent,{recursive:true})
 const directory=await fs.mkdtemp(path.join(parent,'twinwire-worker-'))
-const scriptPath=path.join(directory,'worker.mjs')
-await build({entryPoints:['worker/index.ts'],outfile:scriptPath,bundle:true,format:'esm',platform:'browser',target:'es2023'})
-const options={modules:true,modulesRoot:directory,scriptPath,compatibilityDate:'2025-01-01',durableObjects:{GAME_ROOM:{className:'GameRoom',useSQLite:true},ROOM_REGISTRY:{className:'RoomRegistry',useSQLite:true}},durableObjectsPersist:path.join(directory,'storage'),log:new Log(LogLevel.ERROR)}
+const options=await buildWorkerOptions(directory,new Log(LogLevel.ERROR))
 let mf=new Miniflare(options),base=(await mf.ready).href
 const clients=[]
 const wait=async fn=>{const end=Date.now()+12000;while(!fn()){if(Date.now()>end)throw Error('Timed out waiting for Twinwire game');await new Promise(r=>setTimeout(r,10))}}

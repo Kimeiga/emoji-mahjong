@@ -29,20 +29,32 @@ export interface RoomClient {
   saveCheckpoint(): void
   clearCheckpoint(): void
 }
+
+function readCheckpoint(key: string): ClientCheckpoint | undefined {
+  try { return JSON.parse(sessionStorage.getItem(key) || 'null') ?? undefined } catch { return undefined }
+}
+
+function createResumableClient(options: ConstructorParameters<typeof GameClient>[0], key: string, forget: () => void) {
+  try { return new GameClient({...options, checkpoint: readCheckpoint(key)}) }
+  catch { forget(); return new GameClient(options) }
+}
+
+function socketReadyState(status: GameClient['status']): number {
+  if (status === 'online') return 1
+  return status === 'closed' || status === 'lost' ? 3 : 0
+}
+
 export function connectToRoom(roomCode: string): RoomClient {
   const base = getWorkerOrigin() || location.origin
   const url = new URL('/api/rooms/' + roomCode + '/ws?tw=4', base)
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
   const key = 'twinwire.mahjong.' + roomCode
   const forget = () => { try { sessionStorage.removeItem(key) } catch { /* Storage is optional for in-page recovery. */ } }
-  let checkpoint: ClientCheckpoint | undefined
-  try { checkpoint = JSON.parse(sessionStorage.getItem(key) || 'null') ?? undefined } catch { forget() }
   const options = {url: url.href, room: 'mahjong.' + roomCode, rtc: false as const}
-  let net: GameClient
-  try { net = new GameClient({...options, checkpoint}) } catch { forget(); net = new GameClient(options) }
+  const net = createResumableClient(options, key, forget)
   const client: RoomClient = {
     net,
-    get readyState() { return net.status === 'online' ? 1 : net.status === 'closed' || net.status === 'lost' ? 3 : 0 },
+    get readyState() { return socketReadyState(net.status) },
     send(data) { if (!net.sendEvent(JSON.parse(data))) throw new Error('Connection queue is full; reconnect to your saved game'); client.saveCheckpoint() },
     close() { net.close() },
     saveCheckpoint() { try { const saved = net.checkpoint(); if (saved) sessionStorage.setItem(key,JSON.stringify(saved)) } catch { /* The private game-seat token is a separate recovery path. */ } },

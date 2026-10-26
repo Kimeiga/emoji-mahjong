@@ -14,6 +14,7 @@ import type {
   ServerMessage,
   LobbyPlayer,
   GameStateView,
+  ClientMessage,
 } from '../src/multiplayer/protocol'
 import { parseClientMessage } from '../src/multiplayer/validation'
 import type { PlayerId } from '../src/types'
@@ -221,7 +222,7 @@ export class GameRoom implements DurableObject {
 
     server.accept()
     if (url.searchParams.get('tw') === '4') {
-      this.transport.accept(server, {origin: request.headers.get('origin') ?? '', ip: request.headers.get('CF-Connecting-IP') ?? 'local'})
+      this.acceptTransport(server, request)
       return new Response(null, {status: 101, webSocket: client})
     }
     // One-release compatibility for already open legacy clients during the paired rollout.
@@ -238,6 +239,10 @@ export class GameRoom implements DurableObject {
     })
 
     return new Response(null, { status: 101, webSocket: client })
+  }
+
+  private acceptTransport(server: WebSocket, request: Request) {
+    this.transport.accept(server, {origin: request.headers.get('origin') ?? '', ip: request.headers.get('CF-Connecting-IP') ?? 'local'})
   }
 
   private handleMessage(ws: RoomPeer, raw: string | ArrayBuffer) {
@@ -261,29 +266,50 @@ export class GameRoom implements DurableObject {
       case 'start':
         this.handleStart()
         break
+      case 'leave':
+        this.handleLeave(ws)
+        break
+      default:
+        this.handleTurnMessage(ws, msg)
+    }
+  }
+
+  private handleTurnMessage(ws: RoomPeer, msg: ClientMessage) {
+    switch (msg.type) {
       case 'discard':
         this.handleDiscard(ws, msg.tileId)
-        break
-      case 'call-pon':
-        this.handleCallPon(ws)
-        break
-      case 'decline-pon':
-        this.handleDeclinePon(ws, msg.tileId)
         break
       case 'declare-riichi':
         this.handleDeclareRiichi(ws)
         break
+      default:
+        this.handleDrawMessage(ws, msg)
+    }
+  }
+
+  private handleDrawMessage(ws: RoomPeer, msg: ClientMessage) {
+    switch (msg.type) {
       case 'pick-market':
         this.handlePickMarket(ws, msg.tileId)
         break
       case 'draw-blind':
         this.handleDrawBlind(ws)
         break
+      default:
+        this.handleReactionMessage(ws, msg)
+    }
+  }
+
+  private handleReactionMessage(ws: RoomPeer, msg: ClientMessage) {
+    switch (msg.type) {
+      case 'call-pon':
+        this.handleCallPon(ws)
+        break
+      case 'decline-pon':
+        this.handleDeclinePon(ws, msg.tileId)
+        break
       case 'rematch':
         this.handleRematch(ws)
-        break
-      case 'leave':
-        this.handleLeave(ws)
         break
       default:
         this.send(ws, { type: 'error', message: `Unknown message type` })
@@ -296,37 +322,23 @@ export class GameRoom implements DurableObject {
       this.send(ws, { type: 'assigned', playerId: assigned.playerId, resumeToken: this.seatTokens[assigned.playerId] })
       return
     }
-    const existing = resumeToken
-      ? this.lobbyPlayers.find(p => this.seatTokens[p.id] === resumeToken && p.isHuman)
-      : this.lobbyPlayers.find(p => p.name === playerName && p.isHuman)
+    const existing = this.findReturningSeat(playerName, resumeToken)
     if (existing) {
-      const token = this.seatTokens[existing.id]
-      // v62 had no tokens. Permit one migration only for a disconnected legacy seat.
-      if ((token && token !== resumeToken) || (!token && existing.connected)) {
-        this.send(ws, { type: 'error', message: 'This name is already in use. Rejoin with the saved session.', code: 'SESSION_INVALID' })
-        return
-      }
-      for (const [oldWs, info] of this.players) {
-        if (info.playerId === existing.id) {
-          this.players.delete(oldWs)
-          oldWs.close(4001, 'Session resumed elsewhere')
-        }
-      }
-      this.players.set(ws, { playerId: existing.id, name: existing.name })
-      this.seatTokens[existing.id] = token ?? crypto.randomUUID()
-      existing.connected = true
-      this.expiresAt = 0
-      this.send(ws, { type: 'assigned', playerId: existing.id, resumeToken: this.seatTokens[existing.id] })
-      this.broadcastRoomState()
-      this.sendGameStateToPlayer(ws, existing.id)
-      this.updateRegistry()
-      this.scheduleAITurns()
+      this.resumeSeat(ws, existing, resumeToken)
       return
     }
-    if (resumeToken || this.gameStarted) {
+    if (!this.canCreateSeat(resumeToken)) {
       this.send(ws, { type: 'error', message: 'This saved session is no longer available. Create a new room.', code: 'SESSION_INVALID' })
       return
     }
+    this.createSeat(ws, playerName)
+  }
+
+  private canCreateSeat(resumeToken?: string): boolean {
+    return !resumeToken && !this.gameStarted
+  }
+
+  private createSeat(ws: RoomPeer, playerName: string) {
     const seatId = ([0, 1, 2, 3] as PlayerId[]).find(id => !this.lobbyPlayers.some(p => p.id === id && p.isHuman))
     if (seatId === undefined) {
       this.send(ws, { type: 'error', message: 'Room is full', code: 'ROOM_FULL' })
@@ -341,6 +353,44 @@ export class GameRoom implements DurableObject {
     this.send(ws, { type: 'assigned', playerId: seatId, resumeToken: this.seatTokens[seatId] })
     this.broadcastRoomState()
     this.updateRegistry()
+  }
+
+  private findReturningSeat(playerName: string, resumeToken?: string) {
+    const humans = this.lobbyPlayers.filter(player => player.isHuman)
+    if (resumeToken) return humans.find(player => this.seatTokens[player.id] === resumeToken)
+    return humans.find(player => player.name === playerName)
+  }
+
+  private canResumeSeat(seat: LobbyPlayer, resumeToken?: string): boolean {
+    const token = this.seatTokens[seat.id]
+    // v62 had no tokens. Permit one migration only for a disconnected legacy seat.
+    if (token) return token === resumeToken
+    return !seat.connected
+  }
+
+  private retireSeatConnections(playerId: PlayerId) {
+    for (const [oldWs, info] of this.players) {
+      if (info.playerId !== playerId) continue
+      this.players.delete(oldWs)
+      oldWs.close(4001, 'Session resumed elsewhere')
+    }
+  }
+
+  private resumeSeat(ws: RoomPeer, seat: LobbyPlayer, resumeToken?: string) {
+    if (!this.canResumeSeat(seat, resumeToken)) {
+      this.send(ws, { type: 'error', message: 'This name is already in use. Rejoin with the saved session.', code: 'SESSION_INVALID' })
+      return
+    }
+    this.retireSeatConnections(seat.id)
+    this.players.set(ws, { playerId: seat.id, name: seat.name })
+    this.seatTokens[seat.id] ??= crypto.randomUUID()
+    seat.connected = true
+    this.expiresAt = 0
+    this.send(ws, { type: 'assigned', playerId: seat.id, resumeToken: this.seatTokens[seat.id] })
+    this.broadcastRoomState()
+    this.sendGameStateToPlayer(ws, seat.id)
+    this.updateRegistry()
+    this.scheduleAITurns()
   }
 
   private handleSetAIDifficulty(difficulty: AIDifficulty) {
@@ -390,11 +440,11 @@ export class GameRoom implements DurableObject {
   }
 
   private handleDiscard(ws: RoomPeer, tileId: string) {
-    if (!this.runner || !this.gameStarted) return
-    const info = this.players.get(ws)
-    if (!info) return
+    const active = this.activePlayer(ws)
+    if (!active) return
+    const {runner, info} = active
 
-    const state = this.runner.getState()
+    const state = runner.getState()
     if (state.currentPlayer !== info.playerId) {
       this.send(ws, { type: 'error', message: 'Not your turn' })
       return
@@ -405,9 +455,9 @@ export class GameRoom implements DurableObject {
     }
 
     try {
-      this.runner.discard(tileId)
+      runner.discard(tileId)
     } catch (error) {
-      this.send(ws, { type: 'error', message: error instanceof Error ? error.message : String(error) })
+      this.sendActionError(ws, error)
       return
     }
 
@@ -417,21 +467,19 @@ export class GameRoom implements DurableObject {
   }
 
   private handleCallPon(ws: RoomPeer) {
-    if (!this.runner || !this.gameStarted) return
-    const info = this.players.get(ws)
-    if (!info) return
-
-    const state = this.runner.getState()
-    if (state.phase !== 'pon-available' || !state.ponAvailable) return
-    if (state.ponAvailable.playerId !== info.playerId) return
+    const active = this.activePlayer(ws)
+    if (!active) return
+    const {runner, info} = active
+    const pon = this.pendingPonFor(info.playerId)
+    if (!pon) return
 
     // Capture pon info BEFORE callPon clears it (getState returns a reference)
-    const ponTileEmoji = state.ponAvailable!.tile.emoji
-    const ponTag = state.ponAvailable!.matchingTag
-    const ponPlayerName = this.lobbyPlayers.find(p => p.id === info.playerId)?.name ?? `Player ${info.playerId}`
+    const ponTileEmoji = pon.tile.emoji
+    const ponTag = pon.matchingTag
+    const ponPlayerName = this.playerName(info.playerId)
 
     try {
-      this.runner.callPon(info.playerId)
+      runner.callPon(info.playerId)
       this.broadcast({
         type: 'toast',
         kind: 'pon',
@@ -440,7 +488,7 @@ export class GameRoom implements DurableObject {
         tag: ponTag,
       })
     } catch (error) {
-      this.send(ws, { type: 'error', message: error instanceof Error ? error.message : String(error) })
+      this.sendActionError(ws, error)
       return
     }
 
@@ -449,25 +497,56 @@ export class GameRoom implements DurableObject {
   }
 
   private handleDeclinePon(ws: RoomPeer, tileId?: string) {
-    if (!this.runner || !this.gameStarted) return
-    const info = this.players.get(ws)
-    if (!info) return
-    const state = this.runner.getState()
-    if (state.phase !== 'pon-available' || !state.ponAvailable) return
-    if (tileId && tileId !== state.ponAvailable.tile.id) return
-    if (state.ponAvailable.playerId !== info.playerId) {
+    const active = this.activePlayer(ws)
+    if (!active) return
+    const {runner, info} = active
+    const pon = this.pendingPon()
+    if (!pon) return
+    if (!this.matchesPonTile(pon.tile.id, tileId)) return
+    if (pon.playerId !== info.playerId) {
       this.send(ws, { type: 'error', message: 'This pon decision belongs to another player' })
       return
     }
 
     try {
-      this.runner.declinePon()
+      runner.declinePon()
     } catch {
       return
     }
 
     this.broadcastGameState()
     this.scheduleAITurns()
+  }
+
+  private activePlayer(ws: RoomPeer) {
+    if (!this.runner || !this.gameStarted) return null
+    const info = this.players.get(ws)
+    if (!info) return null
+    return {runner: this.runner, info}
+  }
+
+  private pendingPon() {
+    const state = this.runner?.getState()
+    if (state?.phase !== 'pon-available') return null
+    return state.ponAvailable
+  }
+
+  private pendingPonFor(playerId: PlayerId) {
+    const pon = this.pendingPon()
+    if (pon?.playerId !== playerId) return null
+    return pon
+  }
+
+  private matchesPonTile(currentTileId: string, requestedTileId?: string): boolean {
+    return !requestedTileId || requestedTileId === currentTileId
+  }
+
+  private playerName(playerId: PlayerId): string {
+    return this.lobbyPlayers.find(player => player.id === playerId)?.name ?? `Player ${playerId}`
+  }
+
+  private sendActionError(ws: RoomPeer, error: unknown) {
+    this.send(ws, {type: 'error', message: error instanceof Error ? error.message : String(error)})
   }
 
   private handleDeclareRiichi(ws: RoomPeer) {
@@ -604,24 +683,14 @@ export class GameRoom implements DurableObject {
   }
 
   private pauseTransport(ws: RoomPeer) {
-    const info = this.players.get(ws)
-    if (!info) return
-    const player = this.lobbyPlayers.find(p => p.id === info.playerId)
-    if (player) player.connected = false
-    if (!this.onlineCount()) {
-      if (this.aiTimer) clearTimeout(this.aiTimer)
-      this.aiTimer = null
-      this.expiresAt = Date.now() + 30 * 60_000
-      this.removeFromRegistry()
-    }
+    if (!this.markSeatPresence(ws, false)) return
+    if (!this.onlineCount()) this.suspendEmptyRoom()
     this.broadcastRoomState()
   }
 
   private restoreTransport(ws: RoomPeer) {
-    const info = this.players.get(ws)
+    const info = this.markSeatPresence(ws, true)
     if (!info) return
-    const player = this.lobbyPlayers.find(p => p.id === info.playerId)
-    if (player) player.connected = true
     this.expiresAt = 0
     this.send(ws, {type:'assigned',playerId:info.playerId,resumeToken:this.seatTokens[info.playerId]})
     this.broadcastRoomState()
@@ -629,6 +698,21 @@ export class GameRoom implements DurableObject {
     this.send(ws, {type:'$twinwire-ready'})
     this.updateRegistry()
     this.scheduleAITurns()
+  }
+
+  private markSeatPresence(ws: RoomPeer, connected: boolean) {
+    const info = this.players.get(ws)
+    if (!info) return
+    const player = this.lobbyPlayers.find(player => player.id === info.playerId)
+    if (player) player.connected = connected
+    return info
+  }
+
+  private suspendEmptyRoom() {
+    if (this.aiTimer) clearTimeout(this.aiTimer)
+    this.aiTimer = null
+    this.expiresAt = Date.now() + 30 * 60_000
+    this.removeFromRegistry()
   }
 
   private handleDisconnect(ws: RoomPeer) {
