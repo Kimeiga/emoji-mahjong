@@ -221,7 +221,8 @@ export class GameRoom implements DurableObject {
     const [client, server] = [pair[0], pair[1]]
 
     server.accept()
-    if (url.searchParams.get('tw') === '4') {
+    // This flag selects the protocol family; Twinwire itself validates the wire generation in hello.
+    if (url.searchParams.has('tw')) {
       this.acceptTransport(server, request)
       return new Response(null, {status: 101, webSocket: client})
     }

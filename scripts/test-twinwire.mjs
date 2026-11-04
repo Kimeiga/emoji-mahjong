@@ -4,6 +4,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import {Miniflare,Log,LogLevel} from 'miniflare'
 import {GameClient} from 'twinwire/client'
+import {VERSION} from 'twinwire'
 const parent=path.resolve('artifacts')
 await fs.mkdir(parent,{recursive:true})
 const directory=await fs.mkdtemp(path.join(parent,'twinwire-worker-'))
@@ -13,7 +14,7 @@ const clients=[]
 const wait=async fn=>{const end=Date.now()+12000;while(!fn()){if(Date.now()>end)throw Error('Timed out waiting for Twinwire game');await new Promise(r=>setTimeout(r,10))}}
 const sleep=ms=>new Promise(r=>setTimeout(r,ms))
 function make(code,name,resumeToken,checkpoint){
- const url=base.replace(/^http/,'ws')+'api/rooms/'+code+'/ws?tw=4'
+ const url=base.replace(/^http/,'ws')+'api/rooms/'+code+'/ws?tw='+VERSION
  const net=new GameClient({url,room:'mahjong.'+code,rtc:false,reconnectBaseMs:30,...(checkpoint?{checkpoint}:{})})
  const messages=[];let seatToken=resumeToken,resumes=0
  net.onSession=info=>{if(info.resumed)resumes++;else net.sendEvent({type:'join',playerName:name,resumeToken:seatToken})}

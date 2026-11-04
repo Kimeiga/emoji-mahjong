@@ -1,4 +1,5 @@
 import {GameClient, type ClientCheckpoint} from 'twinwire/client'
+import {VERSION} from 'twinwire'
 import { type ServerMessage, type ClientMessage } from './protocol'
 
 /**
@@ -46,7 +47,7 @@ function socketReadyState(status: GameClient['status']): number {
 
 export function connectToRoom(roomCode: string): RoomClient {
   const base = getWorkerOrigin() || location.origin
-  const url = new URL('/api/rooms/' + roomCode + '/ws?tw=4', base)
+  const url = new URL('/api/rooms/' + roomCode + '/ws?tw=' + VERSION, base)
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
   const key = 'twinwire.mahjong.' + roomCode
   const forget = () => { try { sessionStorage.removeItem(key) } catch { /* Storage is optional for in-page recovery. */ } }
